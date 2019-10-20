@@ -1,0 +1,34 @@
+{
+  "name": "Asset-Management",
+  "version": "1.0.0",
+  "description": "Asset Management on public blockchain",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "webpack",
+    "dev": "lite-server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/papandas/Asset-Management.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/papandas/Asset-Management/issues"
+  },
+  "homepage": "https://github.com/papandas/Asset-Management#readme",
+  "devDependencies": {
+    "lite-server": "^2.5.4",
+    "truffle": "^5.0.40",
+    "webpack": "^4.41.2",
+    "webpack-cli": "^3.3.9"
+  },
+  "dependencies": {
+    "truffle-assertions": "^0.9.1"
+  }
+}
