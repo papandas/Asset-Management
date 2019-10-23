@@ -1,4 +1,6 @@
 test/Agrichain*
+.secret
+.gitignore
 
 # Logs
 logs

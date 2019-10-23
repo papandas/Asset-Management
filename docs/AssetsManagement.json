@@ -6708,66 +6708,11 @@
     "version": "0.5.1+commit.c8a2cb62.Emscripten.clang"
   },
   "networks": {
-    "5777": {
-      "events": {
-        "0xd93e0959190f2f576553317f9c17f456c15bfbcfd4c7f0c1f14cef985b453ebb": {
-          "anonymous": false,
-          "inputs": [
-            {
-              "indexed": false,
-              "name": "sender",
-              "type": "address"
-            },
-            {
-              "indexed": false,
-              "name": "_type",
-              "type": "uint8"
-            }
-          ],
-          "name": "SignupEvent",
-          "type": "event",
-          "signature": "0xd93e0959190f2f576553317f9c17f456c15bfbcfd4c7f0c1f14cef985b453ebb"
-        },
-        "0xaff77563897b6f6292105ed3ce5943bd6221ed93712f065eefaa7ab51a977433": {
-          "anonymous": false,
-          "inputs": [
-            {
-              "indexed": false,
-              "name": "sender",
-              "type": "address"
-            },
-            {
-              "indexed": false,
-              "name": "assetid",
-              "type": "uint256"
-            }
-          ],
-          "name": "AddAssetEvent",
-          "type": "event",
-          "signature": "0xaff77563897b6f6292105ed3ce5943bd6221ed93712f065eefaa7ab51a977433"
-        },
-        "0x28e8afde4df8f8c71003c736fd6c7c20eb4370e98aafead4223777cbf88c013b": {
-          "anonymous": false,
-          "inputs": [
-            {
-              "indexed": false,
-              "name": "sender",
-              "type": "address"
-            },
-            {
-              "indexed": false,
-              "name": "calibrationsid",
-              "type": "uint256"
-            }
-          ],
-          "name": "AddCalibrationsEvent",
-          "type": "event",
-          "signature": "0x28e8afde4df8f8c71003c736fd6c7c20eb4370e98aafead4223777cbf88c013b"
-        }
-      },
+    "3":{
+      "events": {},
       "links": {},
-      "address": "0x5B201C59abFdAb7671d0d943e206fa55c0A9a2a9",
-      "transactionHash": "0xbb825fa892c0633840d10163110bead96f58b13f5a3dcae8229384a7cd7c6b8a"
+      "address": "0x3c91365993de355eef27b889c723cc56121c084c",
+      "transactionHash": "0xf25f04d2f476f982498f549106f9a652771c037b2554df791d2d68586ed2e2c9"
     }
   },
   "schemaVersion": "3.0.16",

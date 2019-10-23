@@ -1,0 +1,49 @@
+<!-- Page Content -->
+<div class="container pt-5">
+    <div class="card border-0 shadow my-5">
+        <div class="card-body p-5">
+            <div class="row">
+                <div class="col">
+                    <h1 class="font-weight-light">Add New Asset</h1>
+                </div>
+                <div class="col text-right">
+                    <button class="btn btn-primary" onclick="App.LoadDealerPage(); return false;"><i
+                            class="fa fa-arrow-left" aria-hidden="true"></i> Back</button>
+                </div>
+            </div>
+            <p class="lead">Kindly fill up the below form to add a new asset with the network.</p>
+            <form class="col-9">
+                <div class="form-group">
+                    <label for="itemname">Item Name</label>
+                    <input type="text" class="form-control" id="itemname" name="itemname" placeholder="Item Name">
+                </div>
+                <div class="form-group">
+                    <label for="serialnumber">Serial Number</label>
+                    <input type="text" class="form-control" id="serialnumber" name="serialnumber" placeholder="">
+                    <small id="serialnumberHelp" class="form-text text-muted">Kindly providea a unique serial number for
+                        the item.</small>
+                </div>
+                <div class="form-group">
+                    <label for="administrator">Administrator</label>
+                    <input type="text" class="form-control" id="administrator" name="administrator" placeholder="">
+                    <small id="administratorHelp" class="form-text text-muted">Kindly provide wallet address of a driver who is already registered with the plateform.</small>
+                </div>
+                <center>
+                    <button class="btn btn-primary" onclick="App.SaveNewAsset(); return false;">
+                        <i class="fa fa-save"></i> Save
+                    </button>
+                    <button class="btn btn-primary" onclick="App.AddNewAssetPage(); return false;">
+                        <i
+                        class="fa fa-refresh" aria-hidden="true"></i> Reset
+                    </button>
+                    <button class="btn btn-primary" onclick="App.LoadDealerPage(); return false;">
+                        <i
+                        class="fa fa-arrow-left" aria-hidden="true"></i> Back
+                    </button>
+                </center>
+            </form>
+
+
+        </div>
+    </div>
+</div>
