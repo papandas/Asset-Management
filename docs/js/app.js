@@ -1,13 +1,12 @@
 App = {
   web3Provider: null,
-  profile: {},
   contracts: {},
   account: '0x0',
   accountType: 0,
+  accountTypeArray: new Array('DEALER', 'SERVICE_CENTER', 'DRIVER'),
   loading: false,
-  currentState: "0", // 0 is login |
-  participantTyle: NaN,
   assetListArray: new Array(),
+  calibrationListArray: new Array(),
 
   init: function () {
     console.log("App initialized...")
@@ -21,19 +20,20 @@ App = {
       web3 = new Web3(web3.currentProvider);
     } else {
       // Specify default instance if no web3 instance provided
-      App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
+      App.web3Provider = new Web3.providers.HttpProvider('http://127.0.0.1:7545');
       web3 = new Web3(App.web3Provider);
     }
     return App.initContracts();
   },
 
   initContracts: function () {
-    $.getJSON("AssetsManagement.json", function (assetManagementChain) {
-      console.log(assetManagementChain)
+    $.getJSON("../../AssetsManagement.json", function (assetManagementChain) {
+      console.log(assetManagementChain);
       App.contracts.AssetsManagement = TruffleContract(assetManagementChain);
       App.contracts.AssetsManagement.setProvider(App.web3Provider);
-      App.contracts.AssetsManagement.deployed().then(function (assetManagementChain) {
-        //console.log("Contract Address:", 'https://rinkeby.etherscan.io/address/' + assetManagementChain.address);
+      App.contracts.AssetsManagement.deployed().then(function (assetManagementChain, error) {
+        console.log(error)
+        console.log("Contract Address:", 'https://rinkeby.etherscan.io/address/' + assetManagementChain.address);
         $('#contractDetails').empty();
         $('#contractDetails').html(`<h5 class="text-center">Contract</h5>
           <span class="badge badge-light ml-3"> ${assetManagementChain.address.slice(0, 12)}...${assetManagementChain.address.slice(-8)}</span>
@@ -68,24 +68,32 @@ App = {
     $('#accountDetails').empty();
     web3.eth.getCoinbase(function (err, account) {
       if (err === null) {
-        App.account = account;
-        console.log("Account Address:", account);
-        web3.eth.getBalance(App.account, function (err, resp) {
+        if (account === null) {
+          loader.hide();
+          content.show();
+          $('#content').empty();
+          $('#content').html('<h2>Unable to ready Wallet Address.</h2');
+        } else {
+          App.account = account;
+          console.log("Account Address:", account);
+          web3.eth.getBalance(App.account, function (err, resp) {
 
-          if (err === null) {
+            if (err === null) {
 
-            let balance = web3.fromWei(resp.toNumber(), 'ether')
+              let balance = web3.fromWei(resp.toNumber(), 'ether')
 
-            $('#accountDetails').html(`<h5 class="text-center">Account</h5>
-              <span class="badge badge-light ml-3"> ${App.account.slice(0, 12)}...${App.account.slice(-8)}</span>
-              <a class="dropdown-item" href="#">Balance: ${balance.slice(0, 7)} ETH</a>
-              <a class="dropdown-item" href="#"></a>
-              <a class="dropdown-item" href="https://ropsten.etherscan.io/address/${account}" target="_blank">View On Etherscan</a>`)
+              $('#accountDetails').html(`<h5 class="text-center">Account</h5>
+                <span class="badge badge-light ml-3"> ${App.account.slice(0, 12)}...${App.account.slice(-8)}</span>
+                <a class="dropdown-item" href="#">Balance: ${balance.slice(0, 7)} ETH</a>
+                <a class="dropdown-item" href="#" id="accountType"></a>
+                <a class="dropdown-item" href="https://ropsten.etherscan.io/address/${account}" target="_blank">View On Etherscan</a>`)
 
 
-          }
-        });
-        App.CheckSignInStatus();
+            }
+          });
+          App.CheckSignInStatus();
+        }
+
       }
     });
 
@@ -110,6 +118,7 @@ App = {
         $("#accountTypeModel").modal("show")
       } else {
         App.accountType = status[1].toNumber();
+        $("#accountType").html(`Welcome, ${App.accountTypeArray[App.accountType]}`)
       }
     })
   },
@@ -132,18 +141,105 @@ App = {
 
   LoadLandingPage: function () {
     $('#content').empty();
-    $('#content').load('landing.html', function () {
-      $('#alert').empty();
-    });
+    $('#content').load('landing.html');
   },
 
+  /**
+   *  DELEAR PORTAIL
+   */
+
   LoadDealerPage: function () {
+    if (App.accountType != 0) {
+      Swal.fire('You are not a Delear. Kindly login as a dealer.')
+      App.LoadLandingPage();
+      return;
+    }
+
     $('#content').empty();
     $('#content').load('landing-dealer.html', function () {
       App.contracts.AssetsManagement.deployed().then(function (instance) {
         AM_Instance = instance;
-        return AM_Instance.assetIndex();
-      }).then((assetCount) => {
+        return AM_Instance.getAssetByCreator(App.account);
+      }).then((assetsIndexList) => {
+        //console.log("assetsIndexList", assetsIndexList[0].toNumber())
+        let totalAssetItems = assetsIndexList.length;
+        let loadCount = 0;
+        //console.log("Length", totalAssetItems)
+        if (totalAssetItems > 0) {
+          for (let i = 0; i < totalAssetItems; i++) {
+            //console.log(i, "Asset Array List Item :", assetsIndexList[i].toNumber())
+            App.assetListArray = new Array();
+            AM_Instance.assets(assetsIndexList[i].toNumber())
+              .then((assetItem) => {
+                App.assetListArray.push({
+                  'item': assetItem[2],
+                  'serialnumber': assetItem[3],
+                  'date': assetItem[4],
+                  'administrator': assetItem[5],
+                })
+
+                if (loadCount + 1 == totalAssetItems) {
+                  console.log("::: Asset List Loading Complete :::")
+                  console.log("Total Assets Items:", totalAssetItems)
+
+                  if (App.assetListArray.length > 0) {
+                    let bodyStr = `<table id="example" class="display"  style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Item Name</th>
+                            <th>Serial Number</th>
+                            <th>Date</th>
+                            <th>Administrator</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        `
+
+                    for (let each in App.assetListArray) {
+                      (function (idx, arr) {
+                        var date = new Date(parseInt(arr[idx].date));
+                        //console.log("----", date, typeof (arr[idx].date))
+                        bodyStr += `<tr>
+                            <td>${parseInt(idx) + 1}</td>
+                            <td>${arr[idx].item}</td>
+                            <td>${arr[idx].serialnumber}</td>
+                            <td>${date.toLocaleDateString()}</td>
+                            <td><a href="https://ropsten.etherscan.io/address/${arr[idx].administrator}" target="_blank">${arr[idx].administrator.slice(0, 7)}...${arr[idx].administrator.slice(-7)}</a></td>
+                            </tr>`
+                      })(each, App.assetListArray);
+                    }
+
+                    bodyStr += `
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                              <th>#</th>
+                              <th>Item Name</th>
+                              <th>Serial Number</th>
+                              <th>Date</th>
+                              <th>Administrator</th>
+                            </tr>
+                        </tfoot>
+                    </table>`
+                    $('#dealer-body').html(bodyStr);
+                    $('#example').DataTable();
+
+                  }
+                } else {
+                  loadCount++
+                }
+
+
+              })
+
+          }
+        } else {
+          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          The Asset list is empty. Kindly add asset.
+        </div>`);
+        }
+      })/*.then((assetCount) => {
         console.log("Total Asset Count: ", assetCount.toNumber())
         //return AM_Instance.assets();
         $('#dealer-body').empty();
@@ -215,12 +311,8 @@ App = {
             })
           }
           
-        } else {
-          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
-          The Asset list is empty. Kindly add asset.
-        </div>`);
-        }
-      }).catch((error) => {
+        } 
+      })*/.catch((error) => {
         console.error("--Error--", error)
       })
     });
@@ -228,7 +320,20 @@ App = {
 
   AddNewAssetPage: function () {
     $('#content').empty();
-    $('#content').load('add-new-assets.html')
+    $('#content').load('add-new-assets.html', function () {
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.getAllDrivers();
+      }).then((allDrivers) => {
+        let selectStr = "";
+        for (let each in allDrivers) {
+          (function (idx, arr) {
+            selectStr += `<option value="${arr[idx]}">${arr[idx]}</option>`
+          })(each, allDrivers)
+        }
+        $('#administrator').html(`${selectStr}`)
+      })
+    })
   },
 
   SaveNewAsset: function () {
@@ -236,21 +341,21 @@ App = {
 
     const itemname = $('#itemname').val();
     const serialnumber = $('#serialnumber').val();
-    const administrator = $('#administrator').val();
+    const administrator = $('#administrator').find(':selected').val();
     const date = d.getTime().toString();
 
     if (itemname != '' && serialnumber != '' && administrator != '') {
-      console.log(itemname, serialnumber, administrator, date)
+      //console.log(itemname, serialnumber, administrator, date)
 
       $('#content').hide();
       $('#loader').show();
 
       App.contracts.AssetsManagement.deployed().then(function (instance) {
         AM_Instance = instance;
-        return AM_Instance.addAsset(itemname, serialnumber, date, App.account);
+        return AM_Instance.addAsset(itemname, serialnumber, date, administrator);
       }).then((receipt) => {
-        console.log(receipt);
-        if(receipt.tx){
+        //console.log(receipt);
+        if (receipt.tx) {
           $('#content').show();
           $('#loader').hide();
           App.LoadDealerPage();
@@ -259,1286 +364,529 @@ App = {
         console.error("--Error--", error)
       })
 
+    } else {
+      $('#content').show();
+      $('#loader').hide();
+      $('#content').empty();
+      $('#content').html(`<div class="alert alert-danger">
+      <strong>Error!</strong> Required field missing. Try again
+    </div><br/><button class="btn btn-primary" onclick="App.LoadLandingPage(); return false;">Ok</button>`);
     }
 
   },
 
-  ////////////////////////////////////////////////////////////////
   /**
-   * 
+   * SERVICE CENTER
    * 
    */
 
-
-  LoginUser: function () {
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.participants(App.account);
-    }).then((participantDetail) => {
-      App.profile = {};
-      App.profile.account = participantDetail[0];
-      App.profile.email = participantDetail[1];
-      App.profile.fullname = participantDetail[2];
-      App.profile.cellnumber = participantDetail[3];
-      App.profile.type = participantDetail[5].toNumber();
-      App.profile.accountBalance = 0;
-      web3.eth.getBalance(App.account, (err, bal) => {
-        if (err === null) {
-          App.profile.accountBalance = web3.fromWei(bal, 'ether');
-        }
-      });
-
-      console.log(App.profile.email);
-
-      if (App.profile.account == App.account && App.profile.email == $('#username').val()) {
-
-        //participantTyle = participantDetail[5].toNumber()
-        App.LoadDefaultHomePage();
-
-      } else {
-        $('#alert').html('<div class="alert">Wrong credential!</div>');
-        setTimeout(function () { App.LoadLoginPage(); }, 2000);
-      }
-
-      $('#content').show();
-      $('#loader').hide();
-
-    }).catch((error) => {
-      $('#content').show();
-      $('#loader').hide();
-      $('#content').empty();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html('Connection problem! Ethereum network not connected. Kindly check if MetaMask is loged in & Rinkeby Test network is selected. Kindly Try again. ' + error.message);
-        $('#button').html('<a class="button_normal" onclick="App.LoadLoginPage();">Ok</a>');//LoadProducerListPage
-      });
-    })
-  },
-
-  RegisterUser: function () {
-
-    var loader = $('#loader');
-    var content = $('#content');
-
-    loader.show();
-    content.hide();
-
-    const type = parseInt($('#r_type').find(':selected').val());
-    const fullname = $('#r_fullname').val();
-    const email = $('#r_email').val();
-    const cell = $('#r_cell').val();
-    const password = $('#r_password').val();
-
-    //console.log("type", type)
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.participants(App.account);
-    }).then((participants) => {
-      if (participants[0] == App.account) {
-        loader.hide();
-        content.show();
-        $('#alert').html('<div class="alert">Account already registraed as ' + participants[1] + '</div>');
-        console.log("*** User already exit with the Smart-Contract ***");
-        setTimeout(function () { App.LoadLoginPage(); }, 3000);
-        //, participants[5].toNumber();
-      } else {
-        return AgrichainInstance.signup(email, fullname, cell, password, type, {
-          from: App.account,
-          gas: 500000
-        }).then((reply) => {
-          console.log("User successfully created!");
-
-          App.LoadLoginPage();
-          loader.hide();
-          content.show();
-
-        })
-      }
-    });
-  },
-
-  PostAssets: function () {
-
-    $('#content').hide();
-    $('#loader').show();
-
-    const harvers = $('#p_harvest').val();
-    const comodity = parseInt($('#p_commodity').find(':selected').val());
-    const acres = $('#p_acres').val();
-    const _yield = $('#p_yield').val();
-    const basic = $('#p_baiss').val();
-    const Insurance = $('#p_insurance').val();
-    const costs = $('#p_costs').val();
-    const sellprice = $('#p_sellprice').val();
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.PostAssets(harvers, comodity, acres, _yield, basic, Insurance, costs, parseInt(_yield), sellprice, { from: App.account, gas: 5000000 })
-        .then((reply) => {
-          //console.log(reply);
-          $('#content').show();
-          $('#loader').hide();
-          $('#content').empty();
-          $('#content').load('alert-success.html', function () {
-            $('#message').html('<strong>Congraluation,</strong> new assets has been successfully created. Your transaction hash <a href="https://rinkeby.etherscan.io/tx/' + reply.tx + '" target="_blank">' + reply.tx + '</a>');
-            $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');//LoadProducerListPage
-          });
-        })
-        .catch((error) => {
-          console.log("error while saving assets", error.message);
-
-          $('#content').show();
-          $('#loader').hide();
-          $('#content').empty();
-          $('#content').load('alert-success.html', function () {
-            $('#message').html('Failed to create new assets. Kindly try again latter.');
-            $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');//LoadProducerListPage
-          });
-
-          //alert(error.message);
-        })
-    })
-  },
-
-  LoadLoginPage: function () {
-    $('#content').empty();
-    $('#content').load('login.html', function () {
-      $('#alert').empty();
-    });
-  },
-
-  LoadSignUpPage: function () {
-    $('#content').empty();
-    $('#content').load('register.html', function () {
-      $('#alert').empty();
-    });
-  },
-
-  LoadHomePage: function () {
-    $('#content').empty();
-    $('#content').load('Home-page.html');
-  },
-
-  LoadDistributorHomePage: function () {
-    $('#content').empty();
-    $('#content').load('Home-page-distributor.html');
-  },
-
-  LoadCustomerHomePage: function () {
-    $('#content').empty();
-    $('#content').load('Home-page-customers.html');
-  },
-
-  LoadProfileDetailPage: function () {
-    $('#content').empty();
-    $('#content').load('profile_detail.html', function () {
-      $('#profileTitle').html(App.GetAccountTypeName(App.profile.type) + " Profile Detail");
-      $('#email').html(App.profile.email);
-      $('#fullname').html(App.profile.fullname);
-      $('#cellnumber').html(App.profile.cellnumber);
-      $('#accountId').html('<a href="https://rinkeby.etherscan.io/address/' + App.account + '"  target="_blank">' + App.account + '</a>')
-
-      web3.eth.getBalance(App.account, (err, bal) => {
-        if (err === null) {
-          $('#accountBalance').html(web3.fromWei(bal, 'ether') + ' ETH');
-        }
-      });
-
-      var qrcode = new QRCode("qrcode", { width: 128, height: 128, correctLevel: QRCode.CorrectLevel.H });
-      qrcode.clear();
-      qrcode.makeCode(App.account);
-
-    });
-  },
-
-  LoadDefaultHomePage: function () {
-    switch (App.profile.type) {
-      case 0:
-        App.LoadHomePage();
-        //console.log("Is a Producer!")
-        break;
-      case 1:
-        App.LoadDistributorHomePage();
-        //console.log("Is a Distributor!")
-        break;
-      case 2:
-        App.LoadCustomerHomePage();
-        //console.log("Is a Consumner!")
-        break;
-    }
-  },
-
-  // CONSUMERS or CUSTOMERS  LoadCustomerDetailPage
-
-  LoadCustomerDetailPage: function (param) {
-    //console.log('Product Detail of:', param, App.productListArray[param].harvestYear)
-    $('#content').empty();
-    $('#content').load('customer_detail.html', function () {
-      $('#p_harvest').val(App.productListArray[param].harvestYear);
-      $('#p_commodity').val(App.productListArray[param].commodity);
-      $('#p_acres').val(App.productListArray[param].totalAcer);
-      $('#p_yield').val(App.productListArray[param].Qty);
-      $('#p_baiss').val(App.productListArray[param].estimatedBasic);
-      $('#p_insurance').val(App.productListArray[param].cropInsuranceCoverage);
-      $('#p_costs').val(App.productListArray[param].productCost);
-    });
-  },
-
-  LoadConsumberListPage: function () {
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('customer-list.html', function () {
-
-      App.LoadAllAssetsByAccType(App.account);
-
-      setTimeout(function () {
-        //console.log("App.productListArray " , App.productListArray.length)
-        $('#content').show();
-        $('#loader').hide();
-
-        for (let each in App.productListArray) {
-          (function (idx, arr) {
-            let str = '<div class="item item-icon-right">&nbsp;&nbsp;'
-            str += '<a onclick="App.LoadCustomerDetailPage(' + parseInt(idx) + ');" class="year">' + arr[idx].harvestYear + '</a>&nbsp;&nbsp;';
-            str += '<a onclick="App.LoadCustomerDetailPage(' + parseInt(idx) + ');" class="product">' + arr[idx].commodity + '</a>&nbsp;&nbsp;';
-            str += '<a onclick="App.LoadCustomerDetailPage(' + parseInt(idx) + ');" class="yield">' + arr[idx].Qty + '</a>&nbsp;&nbsp;';
-            str += '</div>'
-            $('#ConsumerProductLists').append(str);
-
-          })(each, App.productListArray);
-        }
-      }, 3000)
-
-    });
-  },
-
-
-  ConsumerBuyRequest: function () {
-
-
-    const addr = $('#distri_produ_list').find(':selected').val();
-    const assetId = $('#distri_produ_list_item').find(':selected').val();
-    const quantity = parseInt($('#s_quantity').val());
-
-    $('#loader').show();
-    $('#content').hide();
-    //$('#content').empty();
-
-    //console.log("Asset Id", assetId);
-
-    let _disname = '';
-    let _assetName = '';
-    let _sellPrice = '';
-
-    for (let each in App.productListArray) {
-      (function (idx, arr) {
-        //console.log("Buy Asset Index: ", arr[idx].index, assetId);
-        if (arr[idx].index == assetId) {
-          _assetName = String(arr[idx].harvestYear + ' - ' + arr[idx].commodity);
-          _disname = String(arr[idx].disEmail);
-          _sellPrice = arr[idx].sellPrice;
-        }
-      })(each, App.productListArray)
+  LoadServiceCenterPage: function () {
+    if (App.accountType != 1) {
+      Swal.fire('You are not a Service Center. Kindly login as a Service Center.')
+      App.LoadLandingPage();
+      return;
     }
 
+    $('#content').empty();
+    $('#content').load('landing-service-center.html', function () {
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.getAssetByState(0);
+      }).then((assetsIndexList) => {
+        //console.log("assetsIndexList", assetsIndexList)
+        //console.log("assetsIndexList", assetsIndexList[0].toNumber())
+        let totalAssetItems = assetsIndexList.length;
+        let loadCountAsset = 0;
+        //console.log("Length", totalAssetItems)
+        if (totalAssetItems > 0) {
+          console.log("Total Asset", totalAssetItems)
+          for (let i = 0; i < totalAssetItems; i++) {
+            console.log(i, "(i)/Asset Index", assetsIndexList[i].toNumber())
+            App.assetListArray = new Array();
 
-    //console.log(addr, assetId, quantity);
+            let assetIndex = assetsIndexList[i].toNumber();
+            if (assetIndex != 0) {
+              AM_Instance.assets(assetIndex)
+                .then((assetItem) => {
+                  //console.log(">", assetItem)
 
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.getAssetsIndex({ from: App.account });
-    }).then((assetIndex) => {
+                  App.assetListArray.push({
+                    'id': assetItem[0],
+                    'item': assetItem[2],
+                    'serialnumber': assetItem[3],
+                    'date': assetItem[4],
+                    'administrator': assetItem[5],
+                  })
 
-      let isExist = false;
+                  if (loadCountAsset + 1 == totalAssetItems) {
+                    if (App.assetListArray.length > 0) {
+                      let bodyStr = `<table id="example" class="display"  style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Item Name</th>
+                                <th>Serial Number</th>
+                                <th>Date</th>
+                                <th>Administrator</th>
+                                <th>Calibrate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            `
 
-      for (let each in assetIndex) {
-        (function (idx, arr) {
-          //console.log(arr[idx].toNumber(), parseInt(assetId), "<-");
-          if (arr[idx].toNumber() == parseInt(assetId)) {
-            isExist = true;
-          }
-          //console.log("isExist-in", isExist)
-        })(each, assetIndex)
-      }
-      //console.log("isExist-out", isExist)
-      if (isExist) {
-        $('#loader').hide();
-        $('#content').show();
-        $('#content').empty();
-        $('#content').load('alert-success.html', function () {
-          $('#message').html('The asset selected has already been bought. Kindly select another asset.');
-          $('#button').html('<a class="button_normal" onclick="App.LoadTradeConsumerPage();">Ok</a>');
-        });
-        //console.log("Load message, already exist")
-      } else {
-        return AgrichainInstance.getQtyData(addr, assetId)
-          .then((disQuantity) => {
-            //console.log("Available Quantity:", disQuantity.toNumber())
-            if (disQuantity.toNumber() > 0) {
-              const setPrice = parseFloat(_sellPrice);
-              const grandTotla = parseFloat(setPrice * quantity);
+                      for (let each in App.assetListArray) {
+                        (function (idx, arr) {
+                          var date = new Date(parseInt(arr[idx].date));
+                          //console.log(arr[idx])
+                          bodyStr += `<tr>
+                            <td>${parseInt(idx) + 1}</td>
+                            <td>${arr[idx].item}</td>
+                            <td>${arr[idx].serialnumber}</td>
+                            <td>${date.toLocaleDateString()}</td>
+                            <td><a href="https://ropsten.etherscan.io/address/${arr[idx].administrator}" target="_blank">${arr[idx].administrator.slice(0, 7)}...${arr[idx].administrator.slice(-7)}</a></td>
+                            <td>
+                            <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id}); return false;"><i
+                            class="fa fa-car" aria-hidden="true"></i> Calibrate</button></center>
+                            </td>
+                            </tr>`
+                        })(each, App.assetListArray);
+                      }
 
-              let price = web3.toWei(String(grandTotla), 'ether');
+                      bodyStr += `
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                  <th>#</th>
+                                  <th>Item Name</th>
+                                  <th>Serial Number</th>
+                                  <th>Date</th>
+                                  <th>Administrator</th>
+                                  <th>Calibrate</th>
+                                </tr>
+                            </tfoot>
+                        </table>`
+                      $('#service-center-asset-body').html(bodyStr);
+                      $('#example').DataTable();
 
-              //console.log("TX-Det: Asset Id:", assetId, "Setprice:", setPrice, "Quantity:", quantity, "GrandTotal:", grandTotla, "Price:", price);
+                    }
+                  } else {
+                    loadCountAsset++
+                  }
 
-              /*return "grood";*/
 
-              return AgrichainInstance.ConsumerPurchase(addr, assetId, quantity, { from: App.account, value: price })
-                .then((receipt) => {
-                  $('#content').show();
-                  $('#loader').hide();
-                  $('#content').empty();
-                  $('#content').load('alert-success.html', function () {
-                    $('#message').html("Transactoin Successful! " + quantity + " Kg of " + _assetName + " bought from " + addr + " at " + _sellPrice + " ETH. Your transaction hash is " + receipt.tx);
-                    $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');//LoadProducerListPage
-                  });
                 })
             } else {
-              $('#loader').hide();
-              $('#content').show();
-              $('#content').empty();
-              $('#content').load('alert-success.html', function () {
-                $('#message').html('Stock not available.');
-                $('#button').html('<a class="button_normal" onclick="App.LoadTradeConsumerPage();">Ok</a>');
-              });
-            }
-          })
-      }
+              if (loadCountAsset + 1 == totalAssetItems) {
+                if (App.assetListArray.length > 0) {
+                  let bodyStr = `<table id="example" class="display"  style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Item Name</th>
+                            <th>Serial Number</th>
+                            <th>Date</th>
+                            <th>Administrator</th>
+                            <th>Calibrate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        `
 
-    }).catch((error) => {
-      //console.log(error.message);
-      $('#loader').hide();
-      $('#content').show();
-      $('#content').empty();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html('<strong>::Error::</strong> ' + error.message);
-        $('#button').html('<a class="button_normal" onclick="App.LoadTradeConsumerPage();">Ok</a>');
-      });
-      //App.LoadTradeDistributorPageAllOrders();
-    })
+                  for (let each in App.assetListArray) {
+                    (function (idx, arr) {
+                      var date = new Date(parseInt(arr[idx].date));
+                      //console.log(arr[idx])
+                      bodyStr += `<tr>
+                        <td>${parseInt(idx) + 1}</td>
+                        <td>${arr[idx].item}</td>
+                        <td>${arr[idx].serialnumber}</td>
+                        <td>${date.toLocaleDateString()}</td>
+                        <td>${arr[idx].administrator}</td>
+                        <td>
+                        <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id}); return false;"><i
+                        class="fa fa-car" aria-hidden="true"></i> Calibrate</button></center>
+                        </td>
+                        </tr>`
+                    })(each, App.assetListArray);
+                  }
 
-  },
+                  bodyStr += `
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                              <th>#</th>
+                              <th>Item Name</th>
+                              <th>Serial Number</th>
+                              <th>Date</th>
+                              <th>Administrator</th>
+                              <th>Calibrate</th>
+                            </tr>
+                        </tfoot>
+                    </table>`
+                  $('#service-center-asset-body').html(bodyStr);
+                  $('#example').DataTable();
 
-  LoadAllProduAssetForConsumer: function () {
-
-    $('#s_product_list').empty();
-    $('#s_product_list').append('Loading...');
-
-    const distributorAddr = $('#distri_produ_list').find(':selected').val();
-
-    App.LoadAllAssetsByAccType(distributorAddr);
-
-    setTimeout(function () {
-      //console.log(App.productListArray)
-      let str = '<select id="distri_produ_list_item" class="form-control prof_right_input">';
-
-      for (let each in App.productListArray) {
-        (function (idx, arr) {
-          if (arr[idx].Qty > 0) {
-            str += '<option value="' + arr[idx].index + '">' + arr[idx].harvestYear + ' - ' + arr[idx].commodity + ' - (' + arr[idx].Qty + ' @ ' + arr[idx].sellPrice + ' Eth)</option>';
-          }
-        })(each, App.productListArray)
-      }
-
-      str += '</select>'
-      $('#s_product_list').empty();
-      $('#s_product_list').append(str);
-
-    }, 2000);
-
-
-  },
-
-  LoadTradeConsumerPage: function () {
-    //product_consumer_trade.html
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('product_consumer_trade.html', function () {
-      //$('#content').show();
-      //$('#loader').hide();
-
-      App.contracts.AgriChain.deployed().then(function (instance) {
-        AgrichainInstance = instance;
-        return AgrichainInstance.getAllDistributors()
-
-      }).then((AllDistributors) => {
-        //console.log(AllDistributors);
-
-        if (!AllDistributors.length) {
-          $('#loader').hide();
-          $('#content').show();
-          $('#content').empty();
-          $('#content').load('alert-success.html', function () {
-            $('#message').html("No distributor available. Kindly add a distributor into the Smart-Contract.");
-            $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-          });
-        }
-
-        $('#s_distributor').empty();
-        $('#s_distributor').append('Loading...');
-
-        // LOAD PRODUCER LIST!
-        let length = AllDistributors.length;
-        let str = '<select id="distri_produ_list" class="form-control prof_right_input">';
-
-        for (let each in AllDistributors) {
-          (function (idx, arr) {
-            //console.log(arr[idx])
-
-            return AgrichainInstance.participants(arr[idx])
-              .then((reply) => {
-                //console.log(reply[0]);
-                str += '<option value="' + reply[0] + '">' + reply[1] + '</option>';
-
-                if (length - 1 == idx) {
-
-                  $('#content').show();
-                  $('#loader').hide();
-
-                  setTimeout(function () {
-                    str += '</select><a class="button_normal" onclick="App.LoadAllProduAssetForConsumer();">Load Assets from Distributors</a>';
-                    $('#s_distributor').empty();
-                    $('#s_distributor').append(str);
-
-                  }, 2000);
                 }
-              })
-          })(each, AllDistributors);
-        }
-      });
-    })
-
-  },
-
-  // DISTRIBUTORS COLLECTION
-
-  CreateOrderRequestPost: function () {
-    const producerAddr = $('#distri_produ_list').find(':selected').val();
-    const assetId = $('#distri_produ_list_item').find(':selected').val();
-    const quantity = $('#s_quantity').val();
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.quantitys(assetId)
-    }).then((assetQuantity) => {
-      const availableQuantity = assetQuantity[1].toNumber();
-      const setPrice = parseFloat(assetQuantity[2]);
-      const grandTotla = setPrice * quantity;
-      //console.log(grandTotla, quantity)
-
-      return AgrichainInstance.CreateOrder(producerAddr, assetId, quantity, grandTotla, { from: App.account })
-
-    }).then((receipt) => {
-      $('#content').show();
-      $('#loader').hide();
-      $('#content').empty();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html('Asset order has been succcessfully placed. Your transaction hash is ' + receipt.tx);
-        $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');//LoadProducerListPage
-      });
-    })
-  },
-
-  CreateOrderRequest: function () {
-    const producerAddr = $('#distri_produ_list').find(':selected').val();
-    const assetId = $('#distri_produ_list_item').find(':selected').val();
-    const quantity = $('#s_quantity').val();
-
-    $('#content').hide();
-    $('#loader').show();
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.getAssetsIndex({ from: App.account })
-
-    }).then((assetIndex) => {
-      let exist = false;
-      for (let each in assetIndex) {
-        (function (idx, arr) {
-          if (arr[idx].toNumber() == parseInt(assetId)) {
-
-            $('#content').show();
-            $('#loader').hide();
-            $('#content').empty();
-            $('#content').load('alert-success.html', function () {
-              $('#message').html('Failed to create new order for assets. Asset has already been bought.');
-              $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');//LoadProducerListPage
-            });
-
-            exist = true;
-          }
-        })(each, assetIndex);
-      }
-
-      if (!exist) {
-        App.CreateOrderRequestPost();
-      }
-    })
-
-
-  },
-
-  DistributorProcessPayment: function (orderid) {
-    let _quantity = '';
-    let _price = 0;
-    let _assetName = '';
-
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-
-    for (let each in App.orderListArray) {
-      (function (idx, arr) {
-
-        if (arr[idx].index == orderid) {
-          _assetName = String(arr[idx].harvestYear + ' - ' + arr[idx].commodity);
-          _proname = String(arr[idx].proEmail);
-          _price = parseFloat(arr[idx].sellPrice) * arr[idx].qty;
-        }
-      })(each, App.orderListArray)
-    }
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.orders(orderid);
-    }).then((order) => {
-      _quantity = order[5].toNumber();
-      //_price = order[6].toNumber();
-      let priceInWei = web3.toWei(String(_price), 'ether');
-
-      //console.log(order[2], "i: ", order[0].toNumber(), "p: " + order[6].toNumber(), _price, priceInWei);
-      //return "good";
-      return AgrichainInstance.DistributorPurchase(String(order[2]), order[0].toNumber(), { from: App.account, value: priceInWei });
-    }).then((receipt) => {
-      //console.log(receipt);
-      //console.log(_quantity, _assetName, _proname, )
-      $('#content').show();
-      $('#loader').hide();
-      $('#content').empty();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html("Transactoin Successful! " + _quantity + " Kg of " + _assetName + " sold to " + _proname + " at " + _price + " ETH. Your transaction hash is " + receipt.tx);
-        $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-      });
-    }).catch((error) => {
-      //console.log(error.message);
-      $('#loader').hide();
-      $('#content').show();
-      $('#content').empty();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html('<strong>Error:</strong> ' + error.message);
-        $('#button').html('<a class="button_normal" onclick="App.LoadTradeDistributorPageAllOrders();">Ok</a>');
-      });
-      //App.LoadTradeDistributorPageAllOrders();
-    })
-  },
-
-  LoadTradeDistributorPageAllOrders: function () {
-
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('product_distributor_trade_allorders.html', function () {
-
-      //console.log("Show all order page");
-      App.LoadCompleteOrderList();
-
-
-      setTimeout(function () {
-        console.log("Order List: ", App.orderListArray.length);
-        $('#content').show();
-        $('#loader').hide();
-        $('#produce_order_list').empty();
-        //$('#produce_order_list').html(str);
-
-        if (!App.orderListArray.length) {
-          $('#produce_order_list').empty();
-          //$('#content').load('alert-success.html', function () {
-          $('#produce_order_list').append('Order list empty. Please try again.');
-          //$('#message').html('Order list empty. Please try again.');
-          //$('#button').html('<a class="button_normal" onclick="App.LoadTradeDistributorPage();">Ok</a>');
-          //});
-        }
-
-        for (let each in App.orderListArray) {
-          (function (idx, arr) {
-            //console.log(idx, arr[idx]);
-            //console.log(idx, arr[idx].distributor, App.account);
-            if (arr[idx].distributor == App.account) {
-
-              let str = '<div class="item item-icon-right">&nbsp;&nbsp;'
-              str += '<a class="year">' + arr[idx].harvestYear + '</a>&nbsp;&nbsp;';
-              str += '<a class="product">' + arr[idx].commodity + '</a>&nbsp;&nbsp;';
-              str += '<a class="yield">' + arr[idx].qty + '</a>KG&nbsp;@&nbsp;';
-              str += '<a class="yield">' + arr[idx].sellPrice + ' Eth</a>&nbsp;&nbsp;From:&nbsp;';
-              str += '<a class="yield">' + arr[idx].proEmail + '</a>&nbsp;&nbsp;';
-              str += '<a class="yield" ';
-              switch (arr[idx].repState) {
-                case 0:
-                  str += 'style="color:gray;font-style: italic;">Current Status: Pending';
-                  break;
-                case 1:
-                  str += 'style="color:green;font-style: italic;">Current Status: Accepted';
-                  break;
-                case 2:
-                  str += 'style="color:red;font-style: italic;">Current Status: Rejected';
-                  break;
-                case 3:
-                  str += 'style="color:purple;font-style: italic;">Current Status: Received';
-                  break;
-                default:
-                  str += '>';
-                  break;
-              }
-              str += '</a>&nbsp;&nbsp;';
-
-              if (arr[idx].repState == 1) {
-                str += '<a class="yield button_normal" onclick="App.DistributorProcessPayment(' + arr[idx].index + ');">Received</a>&nbsp;&nbsp;';
               } else {
-                str += '&nbsp;'
+                loadCountAsset++
               }
-
-              str += '</div>'
-
-              $('#produce_order_list').append(str);
-
-
             }
-
-          })(each, App.orderListArray);
-
-        }
-      }, 5000)
-    })
-  },
-
-  LoadTradeDistributorPage: function () {
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('product_distributor_trade.html', function () {
-      //s_distributor
-      App.contracts.AgriChain.deployed().then(function (instance) {
-        AgrichainInstance = instance;
-        return AgrichainInstance.getAllProducers();
-      }).then((AllProducers) => {
-
-        if (!AllProducers.length) {
-          $('#loader').hide();
-          $('#content').show();
-          $('#content').empty();
-          $('#content').load('alert-success.html', function () {
-            $('#message').html("<strong>Failed,</strong> no producers available. Kindly add a producer into the Smart-Contract.");
-            $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-          });
+          }
+        } else {
+          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          There are no new asset added recently. Kinly check latter.
+        </div>`);
         }
 
-        $('#s_distributor').empty();
-        $('#s_distributor').append('Loading...');
+        return AM_Instance.getCalibrationsByCreator(App.account);
+      }).then((calibrationsList) => {
+        //console.log("calibrationsList", calibrationsList)
 
-        // LOAD PRODUCER LIST!
-        let length = AllProducers.length;
-        let str = '<select id="distri_produ_list" class="form-control prof_right_input">';
+        let totalCalibrationsItems = calibrationsList.length;
+        let countLoadCalibrations = 0;
 
-        for (let each in AllProducers) {
-          (function (idx, arr) {
-            //console.log(arr[idx])
+        if (totalCalibrationsItems > 0) {
+          console.log("Total Calibrations Item", totalCalibrationsItems)
+          for (let i = 0; i < totalCalibrationsItems; i++) {
+            console.log(i, "(i)/Calibration Index :", calibrationsList[i].toNumber())
+            App.calibrationListArray = new Array();
 
-            return AgrichainInstance.participants(arr[idx])
-              .then((reply) => {
-                //console.log(reply[0]);
-                str += '<option value="' + reply[0] + '">' + reply[1] + '</option>';
+            let calibrationIndex = calibrationsList[i].toNumber();
 
-                if (length - 1 == idx) {
+            AM_Instance.calibrations(calibrationIndex)
+              .then((calibrationItem) => {
+                //console.log(">", calibrationItem)
 
-                  $('#content').show();
-                  $('#loader').hide();
+                App.calibrationListArray.push({
+                  'calibrationsIndex': calibrationItem[0].toNumber(),
+                  'assetIndex': calibrationItem[1].toNumber(),
+                  'date': calibrationItem[2],
+                  'calibrationType1': calibrationItem[3],
+                  'calibrationType2': calibrationItem[4],
+                  'calibrationType3': calibrationItem[5],
+                  'owner': calibrationItem[6]
+                })
 
-                  setTimeout(function () {
-                    str += '</select><a class="button_normal" onclick="App.LoadAllProduAssetForDistri();">Load Assets from Producer</a>';
-                    $('#s_distributor').empty();
-                    $('#s_distributor').append(str);
+                if (countLoadCalibrations + 1 == totalCalibrationsItems) {
+                  if (App.calibrationListArray.length > 0) {
+                    let bodyStr = `<hr/>
+                    <h3 class="font-weight-light">Calibration List</h3>
+                    <p class="lead">Complete list of calibration done by you.</p>
+                    <table id="calibrationTable" class="display"  style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Calibration Type 1</th>
+                            <th>Calibration Type 2</th>
+                            <th>Calibration Type 3</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        `
 
-                  }, 2000);
+                    for (let each in App.calibrationListArray) {
+                      (function (idx, arr) {
+                        var date = new Date(parseInt(arr[idx].date));
+                        //console.log(arr[idx])
+                        bodyStr += `<tr>
+
+                            <td>${date.toLocaleDateString()}</td>
+                            <td>${arr[idx].calibrationType1}</td>
+                            <td>${arr[idx].calibrationType2}</td>
+                            <td>${arr[idx].calibrationType3}</td>
+                            <td>
+                              <center>
+                                <button class="btn btn-primary" onclick="App.LoadAssetDetailPageForSC('LoadServiceCenterPage','${arr[idx].assetIndex}','${date.toLocaleDateString()}','${arr[idx].calibrationType1}','${arr[idx].calibrationType2}','${arr[idx].calibrationType3}', '${arr[idx].owner}'); return false;">
+                                  <i class="fa fa-info-circle" aria-hidden="true"></i> View Asset
+                                </button>
+                              </center>
+                            </td>
+                            </tr>`
+                      })(each, App.calibrationListArray);
+                    }
+
+                    bodyStr += `
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                            <th>Date</th>
+                            <th>Calibration Type 1</th>
+                            <th>Calibration Type 2</th>
+                            <th>Calibration Type 3</th>
+                            <th>Action</th>
+                            </tr>
+                        </tfoot>
+                    </table>`
+                    $('#service-center-calibration-body').html(bodyStr);
+                    $('#calibrationTable').DataTable();
+                  }
+                } else {
+                  countLoadCalibrations++;
                 }
               })
-          })(each, AllProducers);
+
+          }
+        } else {
+          $('#service-center-calibration-body').html(`<div class="alert alert-danger" role="alert">
+          Your calibration list is empty.
+        </div>`);
         }
       })
-    });
-  },
-
-  LoadAllProduAssetForDistri: function () {
-
-    $('#s_product_list').empty();
-    $('#s_product_list').append('Loading...');
-
-    const producerAddr = $('#distri_produ_list').find(':selected').val();
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.getAssetsIndex({ from: producerAddr })
-        .then((assetsIndex) => {
-
-          const length = assetsIndex.length;
-          let str = '<select id="distri_produ_list_item" class="form-control prof_right_input">';
-
-          for (let each in assetsIndex) {
-            (function (idx, arr) {
-              //console.log(idx, arr[idx].toNumber())
-              return AgrichainInstance.assets(arr[idx].toNumber())
-                .then((assets) => {
-                  //console.log(idx, assets);
-
-                  return AgrichainInstance.quantitys(arr[idx].toNumber())
-                    .then((quantity) => {
-                      if (quantity[1].toNumber() > 0) {
-                        str += '<option value="' + assets[0].toNumber() + '">' + assets[2] + ' - ' + App.GetCommodityName(assets[3].toNumber()) + ' - (' + quantity[1].toNumber() + ' @ ' + quantity[2] + ')</option>';
-                      }
-
-                      if (length - 1 == idx) {
-                        setTimeout(function () {
-                          str += '</select>'
-                          $('#s_product_list').empty();
-                          $('#s_product_list').append(str);
-                        }, 2000);
-                      }
-
-                    })
-
-
-                })
-            })(each, assetsIndex);
-          }
-
-        });
     })
   },
 
-  LoadDistributorDetailPage: function (param) {
-    //console.log('Product Detail of:', param, App.productListArray[param].harvestYear)
+  LoadAssetDetailPageForSC: function (backBtnStr, assetIndex, calDate, ct1, ct2, ct3, owner) {
     $('#content').empty();
-    $('#content').load('distributor_detail.html', function () {
-      $('#p_harvest').val(App.productListArray[param].harvestYear);
-      $('#p_commodity').val(App.productListArray[param].commodity);
-      $('#p_acres').val(App.productListArray[param].totalAcer);
-      $('#p_yield').val(App.productListArray[param].Qty);
-      $('#p_baiss').val(App.productListArray[param].estimatedBasic);
-      $('#p_insurance').val(App.productListArray[param].cropInsuranceCoverage);
-      $('#p_costs').val(App.productListArray[param].productCost);
-      $('#p_buyprice').val(App.productListArray[param].sellPrice);
-    });
-  },
+    $('#content').load('detail-view.html', function () {
+      $('#backBtnCont').html(`<button class="btn btn-primary" onclick="App.${backBtnStr}(); return false;"><i
+      class="fa fa-arrow-left" aria-hidden="true"></i> Back</button>`);
 
-  // load all assets by account id
+      $('#calDate').html(`${calDate}`);
+      $('#ct1').html(`${ct1}`)
+      $('#ct2').html(`${ct2}`)
+      $('#ct3').html(`${ct3}`)
+      $('#owner').html(`${owner}`)
 
-  LoadAllAssetsByAccType: function (param) {
-    App.productListArray = new Array();
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.assets(parseInt(assetIndex));
+      }).then((receipt) => {
+        //console.log(receipt);
+        var date = new Date(parseInt(receipt[4]));
+        $('#item').html(`${receipt[2]}`)
+        $('#serialnumber').html(`${receipt[3]}`)
+        $('#dateCommissioned').html(`${date.toLocaleDateString()}`)
+        $('#admin').html(`${receipt[5]}`)
+      }).catch((error) => {
+        console.error("--Error--", error)
+      })
 
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.getAssetsIndex({ from: param });
-    }).then((assetItems) => {
-      for (let each in assetItems) {
-        (function (idx, arr) {
-          //console.log("Load-Assets::AssetFound", arr[idx].toNumber());
-          AgrichainInstance.assets(arr[idx].toNumber())
-            .then((assetItem) => {
-              let producerObject = new Object();
-              producerObject.index = assetItem[0].toNumber();
-              producerObject.created = assetItem[1].toNumber();
-              producerObject.harvestYear = assetItem[2];
-              producerObject.commodity = App.GetCommodityName(assetItem[3].toNumber());
-              producerObject.totalAcer = assetItem[4];
-              producerObject.averageYield = assetItem[5];
-              producerObject.estimatedBasic = assetItem[6];
-              producerObject.cropInsuranceCoverage = assetItem[7];
-              producerObject.productCost = assetItem[8];
-              AgrichainInstance.quantitys(assetItem[0].toNumber())
-                .then((quantity) => {
-                  producerObject.totQty = quantity[0].toNumber();
-                  producerObject.avaiQty = quantity[1].toNumber();
-                  producerObject.sellPrice = quantity[2];
-
-                  if (App.profile.type == 0) {
-                    App.productListArray.push(producerObject);
-                  } else {
-                    AgrichainInstance.getQtyData(param, assetItem[0].toNumber())
-                      .then((qty) => {
-                        producerObject.Qty = qty.toNumber();
-                        App.productListArray.push(producerObject);
-                      })
-                  }
-                })
-
-            })
-        })(each, assetItems);
-      }
     })
   },
 
-  LoadDistributorListPage: function () {
-    $('#content').hide();
-    $('#loader').show();
+  LoadAddCalibrationPage: function (assetIndex) {
+    //AM_Instance.addCalibration(1, "123456789"/date, "A", "B", "C", { from: service });
     $('#content').empty();
-    $('#content').load('distributor-list.html', function () {
-      App.LoadAllAssetsByAccType(App.account);
-      setTimeout(function () {
-
-        $('#content').show();
-        $('#loader').hide();
-        $('#DistributorProductLists').empty();
-
-        if (!App.productListArray.length) {
-
-          $('#DistributorProductLists').append('<div>No assets available.</div>');
-        }
-
-        //console.log(App.productListArray);
-        for (let each in App.productListArray) {
-          (function (idx, arr) {
-            let str = '<div class="item item-icon-right">&nbsp;&nbsp;'
-            str += '<a onclick="App.LoadDistributorDetailPage(' + parseInt(idx) + ');" class="year">' + arr[idx].harvestYear + '</a>&nbsp;&nbsp;';
-            str += '<a onclick="App.LoadDistributorDetailPage(' + parseInt(idx) + ');" class="product">' + arr[idx].commodity + '</a>&nbsp;&nbsp;';
-            str += '<a onclick="App.LoadDistributorDetailPage(' + parseInt(idx) + ');" class="yield">' + arr[idx].Qty + '</a>Kg&nbsp;&nbsp;';
-            str += '<a onclick="App.LoadDistributorDetailPage(' + parseInt(idx) + ');" class="yield">' + arr[idx].sellPrice + 'Eth</a>&nbsp;&nbsp;';
-
-            str += '</div>'
-            $('#DistributorProductLists').append(str);
-
-          })(each, App.productListArray);
-        }
-
-      }, 3000);
-
-    });
+    $('#content').load('add-calibration.html', function () {
+      $('#assetIndex').val(`${assetIndex}`);
+    })
   },
 
-  // PRODUCERS 
+  SaveNewCalibration: function () {
+    var d = new Date();
 
-  LoadProducerListPage: function () {
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('producer-list.html', function () {
+    const assetIndex = $('#assetIndex').val();
+    const date = d.getTime().toString();
+    const CalibrationType1 = $('#ct1').val();
+    const CalibrationType2 = $('#ct2').val();
+    const CalibrationType3 = $('#ct3').val();
 
+    if (CalibrationType1 && CalibrationType2 && CalibrationType3) {
+      console.log(assetIndex, date, CalibrationType1, CalibrationType2, CalibrationType3)
 
-      // Empty Product list array
-      App.productListArray = new Array();
+      $('#content').hide();
+      $('#loader').show();
 
-      App.contracts.AgriChain.deployed().then(function (instance) {
-        AgrichainInstance = instance;
-        return AgrichainInstance.getAssetsIndex({ from: App.account });
-      }).then((assetItems) => {
-        //console.log("Asset List", assetItems)
-
-        //let assetIndexArray = new Array();
-        if (!assetItems.length) {
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.addCalibration(parseInt(assetIndex), date, CalibrationType1, CalibrationType2, CalibrationType3, { from: App.account });
+      }).then((receipt) => {
+        //console.log(receipt);
+        if (receipt.tx) {
           $('#content').show();
           $('#loader').hide();
-          $('#ProducerProductLists').append('<div>No assets available.</div>');
+          App.LoadServiceCenterPage();
         }
+      }).catch((error) => {
+        console.error("--Error--", error)
+      })
 
-        let str = '';
-        let assetLength = assetItems.length;
+    } else {
+      $('#content').show();
+      $('#loader').hide();
+      $('#content').empty();
+      $('#content').html(`<div class="alert alert-danger">
+      <strong>Error!</strong> Required field missing. Try again
+    </div><br/><button class="btn btn-primary" onclick="App.LoadLandingPage(); return false;">Ok</button>`);
+    }
+  },
 
-        for (let each in assetItems) {
-          (function (idx, arr, done) {
-            //console.log(idx, arr[idx].toNumber());
-            //assetIndexArray.push(arr[idx].toNumber())
 
-            return AgrichainInstance.assets(arr[idx].toNumber())
+  /**
+   * DRIVER
+   */
+
+  LoadDriverPage: function () {
+    if (App.accountType != 2) {
+      Swal.fire('You are not a Driver. Kindly login as a driver.')
+      App.LoadLandingPage();
+      return;
+    }
+
+    $('#content').empty();
+    $('#content').load('landing-driver.html', function () {
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.getAssetByAdministrator(App.account);
+      }).then((assetsIndexList) => {
+        //console.log("assetsIndexList", assetsIndexList[0].toNumber())
+        let totalAssetItems = assetsIndexList.length;
+        let countLoad = 0;
+
+        if (totalAssetItems > 0) {
+          console.log("Total Asset Items: ", totalAssetItems)
+          for (let i = 0; i < totalAssetItems; i++) {
+            //console.log(i, "Asset Array List Item :", assetsIndexList[i].toNumber())
+            App.assetListArray = new Array();
+            AM_Instance.assets(assetsIndexList[i].toNumber())
               .then((assetItem) => {
-                //console.log("Asset Item", idx, assetItem[0].toNumber())
-                //console.log(assetItem[2].toNumber())
+                App.assetListArray.push({
+                  'index': assetItem[0],
+                  'creator': assetItem[1],
+                  'item': assetItem[2],
+                  'serialnumber': assetItem[3],
+                  'date': assetItem[4],
+                  'calibrated': assetItem[6].toNumber()
+                })
 
-                let producerObject = new Object();
-                producerObject._index = assetItem[0].toNumber();
-                producerObject.created = assetItem[1].toNumber();
-                producerObject.harvestYear = assetItem[2];
-                producerObject.commodity = App.GetCommodityName(assetItem[3].toNumber());
-                producerObject.totalAcer = assetItem[4];
+                if (countLoad + 1 == totalAssetItems) {
+                  if (App.assetListArray.length > 0) {
+                    let bodyStr = `<table id="example" class="display"  style="width:100%">
+                      <thead>
+                          <tr>
+                              <th>Calibrated</th>
+                              <th>Item Name</th>
+                              <th>Serial Number</th>
+                              <th>Date</th>
+                              <th>Creator</th>
+                              <th>Action</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          `
 
-                producerObject.estimatedBasic = assetItem[6];
-                producerObject.cropInsuranceCoverage = assetItem[7];
-                producerObject.productCost = assetItem[8];
+                    for (let each in App.assetListArray) {
+                      (function (idx, arr) {
+                        var date = new Date(parseInt(arr[idx].date));
+                        //console.log("----", date, typeof (arr[idx].date))
+                        bodyStr += `<tr>
+                            <td><center>`
+                        
+                        if (arr[idx].calibrated == 1) {
+                          bodyStr += `<i class="fa fa-check-circle fa-2x" style="color:green" aria-hidden="true"></i>`
+                        } else {
+                          bodyStr += `<i class="fa fa-times-circle fa-2x" style="color:red" aria-hidden="true"></i>`
+                        }
+                        bodyStr += `</center></td>
+                            <td>${arr[idx].item}</td>
+                            <td>${arr[idx].serialnumber}</td>
+                            <td>${date.toLocaleDateString()}</td>
+                            <td><a href="https://ropsten.etherscan.io/address/${arr[idx].creator}" target="_blank">${arr[idx].creator.slice(0, 7)}...${arr[idx].creator.slice(-7)}</a></td>
+                            <td><center>`
+                        if (arr[idx].calibrated == 1) {
+                          bodyStr += `<button class="btn btn-primary" onclick="App.LoadAssetDetailPageForDriver('LoadDriverPage',${arr[idx].index}); return false;">
+                                        <i class="fa fa-info-circle" aria-hidden="true"></i> View Asset
+                                      </button>`
+                        }else{
+                          bodyStr += `--`;
+                        }
+                        bodyStr += `</center></td>
+                            </tr>`
+                      })(each, App.assetListArray);
+                    }
 
-                if (App.profile.type == 0) {
-                  return AgrichainInstance.quantitys(assetItem[0].toNumber())
-                    .then((quantity) => {
-                      //console.log(arr[idx].toNumber(), quantity)
-                      producerObject.averageYieldTotal = quantity[0].toNumber();
-                      producerObject.averageYield = quantity[1].toNumber();
-                      producerObject.sellprice = parseFloat(quantity[2]);
-                      App.productListArray.push(producerObject);
+                    bodyStr += `
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                              <th>Calibrated</th>
+                              <th>Item Name</th>
+                              <th>Serial Number</th>
+                              <th>Date</th>
+                              <th>Creator</th>
+                              <th>Action</th>
+                            </tr>
+                        </tfoot>
+                    </table>`
+                    $('#dealer-body').html(bodyStr);
+                    $('#example').DataTable();
 
-                      str += '<div class="item item-icon-right">&nbsp;&nbsp;'
-                      str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="year">' + assetItem[2] + '</a>&nbsp;&nbsp;';
-                      str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="product">' + App.GetCommodityName(assetItem[3].toNumber()) + '</a>&nbsp;&nbsp;';
-                      str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="yield">' + quantity[1].toNumber() + '/' + quantity[0].toNumber() + '</a>&nbsp;&nbsp;';
-                      str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="yield">@' + quantity[2] + 'ETH</a>&nbsp;&nbsp;';
-                      str += '</div>'
-
-
-                      if (assetLength - 1 == idx) {
-                        $('#ProducerProductLists').empty();
-                        $('#ProducerProductLists').append('Loading...');
-                        $('#content').show();
-                        $('#loader').hide();
-                        setTimeout(function () {
-                          //console.log('[append]', str.length);
-
-                          $('#ProducerProductLists').empty();
-                          $('#ProducerProductLists').append(str);
-                          //console.log("App.productListArray: " , App.productListArray)
-                        }, 2000);
-                      }
-
-                    })
+                  }
+                } else {
+                  countLoad++
                 }
-
-
-
-
-
-
-
-
-
               })
 
-          })(each, assetItems)
-
-
+          }
+        } else {
+          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          The Asset list is empty.
+        </div>`);
         }
-
+      }).catch((error) => {
+        console.error("--Error--", error)
       })
     });
   },
 
-  LoadProducerDetailPage: function (param) {
-    //console.log('Product Detail of:', param, App.productListArray[param].harvestYear)
+  LoadAssetDetailPageForDriver: function (backBtnStr, assetIndex) {
     $('#content').empty();
-    $('#content').load('product_detail.html', function () {
-      $('#p_harvest').val(App.productListArray[param].harvestYear);
-      $('#p_commodity').val(App.productListArray[param].commodity);
-      $('#p_acres').val(App.productListArray[param].totalAcer);
-      $('#p_yield_total').val(App.productListArray[param].averageYieldTotal);
-      $('#p_yield').val(App.productListArray[param].averageYield);
-      $('#p_baiss').val(App.productListArray[param].estimatedBasic);
-      $('#p_insurance').val(App.productListArray[param].cropInsuranceCoverage);
-      $('#p_costs').val(App.productListArray[param].productCost);
-      $('#p_sellprice').val(App.productListArray[param].sellprice);
-    });
-  },
+    $('#content').load('detail-view.html', function () {
+      $('#backBtnCont').html(`<button class="btn btn-primary" onclick="App.${backBtnStr}(); return false;"><i
+      class="fa fa-arrow-left" aria-hidden="true"></i> Back</button>`);
 
-  LoadCompleteOrderList: function () {
-    // orderListArray
-    App.orderListArray = new Array();
+      $('#calDate').html('');
+      $('#ct1').html('')
+      $('#ct2').html('')
+      $('#ct3').html('')
+      $('#owner').html('')
 
-    let totalOrders = 0;
+      App.contracts.AssetsManagement.deployed().then(function (instance) {
+        AM_Instance = instance;
+        return AM_Instance.assets(parseInt(assetIndex));
+      }).then((receipt) => {
+        //console.log(receipt);
+        var date = new Date(parseInt(receipt[4]));
+        $('#item').html(`${receipt[2]}`)
+        $('#serialnumber').html(`${receipt[3]}`)
+        $('#dateCommissioned').html(`${date.toLocaleDateString()}`)
+        $('#admin').html(`${receipt[5]}`)
 
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.orderIndex();
-    }).then((_totalOrders) => {
-      totalOrders = _totalOrders.toNumber();
-      console.log("Total Orders Count:", totalOrders);
-
-
-      for (let i = 0; i < totalOrders; i++) {
-        //console.log(i);
-        AgrichainInstance.orders(parseInt(i + 1))
-          .then((order) => {
-            //console.log(order)
-            //console.log("==================================");
-            let obj = {};
-            obj.index = order[0].toNumber();
-            obj.created = order[1].toNumber();
-            obj.producer = order[2];
-            obj.distributor = order[3];
-            obj.AssetIndex = order[4].toNumber();
-            obj.qty = order[5].toNumber();
-            obj.price = order[6].toNumber();
-            obj.state = order[7].toNumber();
-            obj.repState = order[8].toNumber();
-            obj.delivery = order[9].toNumber();
-
-            AgrichainInstance.assets(order[4].toNumber()).then((asset) => {
-              obj.harvestYear = asset[2];
-              obj.commodity = App.GetCommodityName(asset[3].toNumber());
-
-              AgrichainInstance.participants(order[2]).then((distributor) => {
-                obj.proEmail = distributor[1];
-                obj.proName = distributor[2];
-
-                AgrichainInstance.participants(order[3]).then((distributor) => {
-                  obj.disEmail = distributor[1];
-                  obj.disName = distributor[2];
-
-                  AgrichainInstance.quantitys(order[4].toNumber()).then((quantity) => {
-                    obj.sellPrice = quantity[2];
-                    App.orderListArray.push(obj);
-
-                    //console.log(obj.index, i, App.orderListArray.length);
-
-                  }).catch((error) => {
-                    console.log("Error loading asset quantity.", error.message);
-                  })
-                }).catch((error) => {
-                  console.log("Error loading participant details.", error.message);
-                });
-              }).catch((error) => {
-                console.log("Error loading participant details.", error.message);
-              });
-            }).catch((error) => {
-              console.log("Error loading asset details.", error.message);
-            })
-          }).catch((error) => {
-            console.log("Error loading order details.", error.message);
-          })
-      }
-
-    })
-  },
-
-  UpdateOrderState: function (OrderIndex, OrderState, OrderReplyState) {
-    // Order id, Order State, Order Reply Status, Delivery time
-    // return AgrichainInstance.UpdateOrder(OrderIndex, OrderState, OrderReplyState, 1, {from:App.account});
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-      return AgrichainInstance.UpdateOrder(OrderIndex, OrderState, OrderReplyState, 1, { from: App.account });
-    }).then((reply) => {
-      $('#content').show();
-      $('#loader').hide();
-      $('#content').load('alert-success.html', function () {
-        $('#message').html('Order state submitted successfully. Your transaction hash is ' + reply.tx);
-        $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-      });
-    })
-
-  },
-
-  LoadTradeProducerPage: function () {
-    let totalOrders = 0;
-    let str = '';
-
-    $('#content').hide();
-    $('#loader').show();
-    $('#content').empty();
-    $('#content').load('product_producer_trade.html', function () {
-
-      App.LoadCompleteOrderList();
-      setTimeout(function () {
-        console.log("Order List: ", App.orderListArray.length);
-        //producer@company.com
-        $('#content').show();
-        $('#loader').hide();
-        $('#produce_order_list').empty();
-
-        if (!App.orderListArray.length) {
-          $('#produce_order_list').empty();
-          //$('#content').load('alert-success.html', function () {
-          $('#produce_order_list').append('Order list empty. Please try again.');
-          //$('#message').html('Order list empty. Please try again.');
-          //$('#button').html('<a class="button_normal" onclick="App.LoadTradeDistributorPage();">Ok</a>');
-          //});
-        }
-        //$('#produce_order_list').html(str);
-        for (let each in App.orderListArray) {
-          (function (idx, arr) {
-            //console.log(arr[idx])
-            //let date = new Date(arr[idx].created)
-            if (arr[idx].producer == App.account) {
-
-              let str = '<div class="item item-icon-right">&nbsp;&nbsp;'
-              str += '<a class="year">' + arr[idx].harvestYear + '</a>&nbsp;&nbsp;';
-              str += '<a class="product">' + arr[idx].commodity + '</a>&nbsp;&nbsp;';
-              str += '<a class="yield">' + arr[idx].qty + '</a>KG&nbsp;@&nbsp;';
-              str += '<a class="yield">' + arr[idx].sellPrice + ' Eth</a>&nbsp;&nbsp;To:&nbsp;';
-              str += '<a class="yield">' + arr[idx].disEmail + '</a>&nbsp;&nbsp;';
-
-              //str += '<a class="button_normal" onclick="App.UpdateOrderState(' + arr[idx].index + ', 1, 1);">Accept</a>&nbsp;&nbsp;<a class="button_normal" onclick="App.UpdateOrderState(' + arr[idx].index + ', 1, 2);">Reject</a>';
-              switch (arr[idx].repState) {
-                case 0:
-                  str += '<div style="300px;"><table border="0"><tr>';
-                  str += '<td width="60">Delivery Date:</td>';
-                  str += '<td width="80"><select class="form-control prof_right_input">';
-                  str += '<option selected>Date</option>';
-                  for (let dt = 1; dt < 32; dt++) {
-                    str += '<option>' + dt + '</option>';
-                  }
-                  str += '</select></td>';
-                  str += '<td width="80"><select class="form-control prof_right_input">';
-                  str += '<option selected>Month</option>';
-                  for (let mt = 1; mt < 13; mt++) {
-                    str += '<option>' + mt + '</option>';
-                  }
-                  str += '</select></td>';
-                  str += '<td width="80"><select class="form-control prof_right_input">';
-                  str += '<option selected>Year</option>';
-                  for (let yr = 2018; yr > 1918; yr--) {
-                    str += '<option>' + yr + '</option>';
-                  }
-                  str += '</select></td>';
-                  str += '</tr></table></div>';
-                  str += '<input type="date"/><a class="button_normal" onclick="App.UpdateOrderState(' + arr[idx].index + ', 1, 1);">Accept</a>&nbsp;&nbsp;<a class="button_normal" onclick="App.UpdateOrderState(' + arr[idx].index + ', 1, 2);">Reject</a>';
-                  break;
-                case 1:
-                  str += '<a class="yield" style="color:green;font-style: italic;">Current Status: Accepted</a>&nbsp;&nbsp;';
-                  break;
-                case 2:
-                  str += '<a class="yield" style="color:red;font-style: italic;">Current Status: Rejected</a>&nbsp;&nbsp;';
-                  break;
-                case 3:
-                  str += '<a class="yield" style="color:purple;font-style: italic;">Current Status: Delivered</a>&nbsp;&nbsp;';
-                  break;
-                default:
-                  str += '<a class="yield" >&nbsp;</a>&nbsp;';
-                  break;
-              }
-
-
-              /*if (arr[idx].repState == 1) {
-                str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="yield button_normal" onclick="App.DistributorProcessPayment(' + arr[idx].index + ');">Received</a>&nbsp;&nbsp;';
-              } else {
-                str += '&nbsp;'
-              }*/
-
-              str += '</div>'
-
-              //let str = '<div class="item item-icon-right">&nbsp;&nbsp;' + arr[idx].harvestYear + ' - ' + arr[idx].commodity ;
-              //str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="year">' + assetItem[2] + '</a>&nbsp;&nbsp;';
-              //str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="product">' + App.GetCommodityName(assetItem[3].toNumber()) + '</a>&nbsp;&nbsp;';
-              //str += '<a onclick="App.LoadProducerDetailPage(' + parseInt(App.productListArray.length - 1) + ');" class="yield">' + quantity[1].toNumber() + '</a>&nbsp;&nbsp;';
-              //str += '</div>'
-              $('#produce_order_list').append(str);
-              //$( "#datepicker" ).datepicker();
-
+        return AM_Instance.calibrationsIndex();
+      }).then((count) => {
+        //console.log(count.toNumber());
+        let loadCount=0;
+        for(let i=1; i<=count.toNumber(); i++){
+          AM_Instance.calibrations(i)
+          .then((item)=>{
+            //console.log(item)
+            if(item[1].toNumber() === assetIndex){
+              $('#calDate').html(`${item[2]}`);
+              $('#ct1').html(`${item[3]}`);
+              $('#ct2').html(`${item[4]}`);
+              $('#ct3').html(`${item[5]}`);
+              $('#owner').html(`${item[6]}`);
             }
 
-          })(each, App.orderListArray);
-
+            if(loadCount + 1 == count){
+              console.log("Calibrations Data Loading Over", "Total: ", count)
+            }else{
+              loadCount++
+            }
+          })
+          .catch((error)=>{
+            console.error("--Error--", error)
+          })
         }
-
-      }, 5000);
-
-
-
-    });
-  },
-
-  LoadProductProducerPage: function () {
-    $('#content').empty();
-    $('#content').load('product_producer.html');
-  },
-
-  SellProductToDistributor: function () {
-    $('#content').hide();
-    $('#loader').show();
-
-    const distributor = $('#s_distributor').find(':selected').val();
-    const _index = parseInt($('#s_product_list').find(':selected').val());
-    const _distname = $('#s_distributor').find(':selected').text();
-    const _itemName = $('#s_product_list').find(':selected').text();
-    const quantity = $('#s_quantity').val();
-
-    //console.log(distributor, _distname, _itemName, _index, quantity);
-
-    App.contracts.AgriChain.deployed().then(function (instance) {
-      AgrichainInstance = instance;
-
-      return AgrichainInstance.quantitys(_index)
-        .then((_quantity) => {
-          if (parseInt(quantity) <= _quantity[1].toNumber()) {
-            return AgrichainInstance.sellToDistributor(distributor, _index, quantity)
-              .then(() => {
-                $('#content').show();
-                $('#loader').hide();
-                $('#content').empty();
-                $('#content').load('alert-success.html', function () {
-                  $('#message').html("<strong>Success,</strong> " + quantity + " Kg of " + _itemName + " sold to " + _distname);
-                  $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-                });
-              })
-          } else {
-            $('#content').show();
-            $('#loader').hide();
-            $('#content').empty();
-            $('#content').load('alert-success.html', function () {
-              $('#message').html("<strong>Failed,</strong> Not enought stock available.");
-              $('#button').html('<a class="button_normal" onclick="App.LoadDefaultHomePage();">Ok</a>');
-            });
-          }
-        })
+      }).catch((error) => {
+        console.error("--Error--", error)
+      })
 
     })
   },
 
-  GetAccountTypeName: function (param) {
-    let str = '';
-    switch (param) {
-      case 0:
-        str = 'Producer';
-        break;
-      case 1:
-        str = 'Distributor';
-        break;
-      case 2:
-        str = 'Consumer';
-        break;
-      default:
-        break;
-    }
-    return str;
-  },
 
-  GetCommodityName: function (param) {
-    //POTATO, APPLES, , , , , 
-    //console.log(param, typeof(param));
-    let str = '';
-    switch (param) {
-      case 0:
-        str = "POTATO";
-        break;
-
-      case 1:
-        str = "APPLES";
-        break;
-
-      case 2:
-        str = "STRAWBERRY";
-        break;
-
-      case 3:
-        str = "BLUEBERRY";
-        break;
-
-      case 4:
-        str = "BLUEB";
-        break;
-
-      case 5:
-        str = "WHEAT";
-        break;
-
-      case 6:
-        str = "OAT";
-        break;
-
-      default:
-        str = "";
-        break;
-    }
-    return str;
-  },
 }
 
 $(function () {
