@@ -1,5 +1,5 @@
 # Asset-Management
-Asset Management on public blockchain 
+Asset Management on EVM using Ropsten Testnet [link to Google!](http://google.com) 
 
 Participants
 - Dealer
