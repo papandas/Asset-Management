@@ -13,3 +13,7 @@ Participants
 - Driver
   - Can check the list of all assets administrated by driver
   - View a detail list of Assets and Respective Calibration.
+
+  <p align="center">
+  <img width="460" height="300" src="http://www.fillmurray.com/460/300">
+</p>
