@@ -1,5 +1,7 @@
 # Asset-Management
-Asset Management on EVM using Ropsten Testnet [link to Google!](http://google.com) 
+Asset Management on EVM using [Ropsten Testnet](https://ropsten.etherscan.io/) 
+
+> [Click Here](https://papandas.github.io/Asset-Management/) for demo!
 
 Participants
 - Dealer
