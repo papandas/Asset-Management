@@ -32,7 +32,7 @@ App = {
   },
 
   initContracts: function () {
-    $.getJSON("../../AssetsManagement.json", function (assetManagementChain) {
+    $.getJSON("./AssetsManagement.json", function (assetManagementChain) {
       console.log(assetManagementChain);
       App.contracts.AssetsManagement = TruffleContract(assetManagementChain);
       App.contracts.AssetsManagement.setProvider(App.web3Provider);
