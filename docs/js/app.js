@@ -111,8 +111,6 @@ App = {
           console.error("--Error--", error)
         }
       });
-      
-
     });
   },
   render: function () {
