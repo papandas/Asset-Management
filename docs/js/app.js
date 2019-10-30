@@ -7,7 +7,12 @@ App = {
   loading: false,
   assetListArray: new Array(),
   calibrationListArray: new Array(),
-
+  toast: Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000
+  }),
   init: function () {
     console.log("App initialized...")
     return App.initWeb3();
@@ -27,7 +32,7 @@ App = {
   },
 
   initContracts: function () {
-    $.getJSON("./AssetsManagement.json", function (assetManagementChain) {
+    $.getJSON("../../AssetsManagement.json", function (assetManagementChain) {
       console.log(assetManagementChain);
       App.contracts.AssetsManagement = TruffleContract(assetManagementChain);
       App.contracts.AssetsManagement.setProvider(App.web3Provider);
@@ -47,9 +52,69 @@ App = {
 
   // Listen for events emitted from the contract
   listenForEvents: function () {
+    App.contracts.AssetsManagement.deployed().then(function (instance) {
+      // Restart Chrome if you are unable to receive this event
+      // This is a known issue with Metamask
+      // https://github.com/MetaMask/metamask-extension/issues/2393
+      instance.SignupEvent({}, {
+        fromBlock: 0,
+        toBlock: 'latest'
+      }).watch(function (error, event) {
+        
+        if (error === null) {
+          if(App.account == event.args.sender){
+            console.log("["+ event.event+"]","Type", event.args._type.toNumber())
+          }
+        }else {
+          console.error("--Error--", error)
+        }
+      });
 
+      instance.AddAssetEvent({}, {
+        fromBlock: 0,
+        toBlock: 'latest'
+      }).watch(function (error, event) {
+        
+        if (error === null) {
+          if(App.account == event.args.sender){
+            console.log("["+ event.event+"]","Wrong Asset Id", event.args.assetid.toNumber())
+          }
+        } else {
+          console.error("--Error--", error)
+        }
+      });
+
+      instance.AddCalibrationsEvent({}, {
+        fromBlock: 0,
+        toBlock: 'latest'
+      }).watch(function (error, event) {
+        
+        if (error === null) {
+          if(App.account == event.args.sender){
+            console.log("["+ event.event+"]","Calibration Id", event.args.calibrationsid.toNumber())
+          }
+        }else {
+          console.error("--Error--", error)
+        }
+      });
+      
+      instance.UpdateAssetForCallibration({}, {
+        fromBlock: 0,
+        toBlock: 'latest'
+      }).watch(function (error, event) {
+        
+        if (error === null) {
+          if(App.account == event.args.sender){
+            console.log("["+ event.event+"]","AssetId", event.args.assetid.toNumber())
+          }
+        }else {
+          console.error("--Error--", error)
+        }
+      });
+      
+
+    });
   },
-
   render: function () {
     if (App.loading) {
       return;
@@ -109,12 +174,12 @@ App = {
       AM_Instance = instance;
       return AM_Instance.participants(App.account);
     }).then((status) => {
-      console.log("Account Status: ", status)
+      //console.log("Account Status: ", status)
       //console.log(status[0])
       let statusString = status[0].toString();
-      console.log(statusString.indexOf("0x00"))
+      //console.log(statusString.indexOf("0x00"))
       if (statusString == "0x" || statusString.indexOf("0x00") == 0) {
-        console.log("Account Do not exist")
+        //console.log("Account Do not exist")
         $("#accountTypeModel").modal("show")
       } else {
         App.accountType = status[1].toNumber();
@@ -133,6 +198,12 @@ App = {
       if (receipt.tx) {
         $("#accountTypeModel").modal("hide");
         App.CheckSignInStatus();
+
+        App.toast.fire({
+          type: 'success',
+          title: 'Signed in successfully.'
+        })
+
       } else {
         console.log("Error while saving account details.")
       }
@@ -171,6 +242,7 @@ App = {
             App.assetListArray = new Array();
             AM_Instance.assets(assetsIndexList[i].toNumber())
               .then((assetItem) => {
+                //console.log(assetItem[3], assetItem[6].toNumber())
                 App.assetListArray.push({
                   'item': assetItem[2],
                   'serialnumber': assetItem[3],
@@ -179,8 +251,8 @@ App = {
                 })
 
                 if (loadCount + 1 == totalAssetItems) {
-                  console.log("::: Asset List Loading Complete :::")
-                  console.log("Total Assets Items:", totalAssetItems)
+                  //console.log("::: Asset List Loading Complete :::")
+                  //console.log("Total Assets Items:", totalAssetItems)
 
                   if (App.assetListArray.length > 0) {
                     let bodyStr = `<table id="example" class="display"  style="width:100%">
@@ -235,7 +307,7 @@ App = {
 
           }
         } else {
-          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          $('#dealer-body').html(`<div class="alert alert-info" role="alert">
           The Asset list is empty. Kindly add asset.
         </div>`);
         }
@@ -359,6 +431,12 @@ App = {
           $('#content').show();
           $('#loader').hide();
           App.LoadDealerPage();
+
+
+          App.toast.fire({
+            type: 'success',
+            title: 'Asset added successfully.'
+          })
         }
       }).catch((error) => {
         console.error("--Error--", error)
@@ -368,7 +446,7 @@ App = {
       $('#content').show();
       $('#loader').hide();
       $('#content').empty();
-      $('#content').html(`<div class="alert alert-danger">
+      $('#content').html(`<div class="alert alert-info">
       <strong>Error!</strong> Required field missing. Try again
     </div><br/><button class="btn btn-primary" onclick="App.LoadLandingPage(); return false;">Ok</button>`);
     }
@@ -393,11 +471,11 @@ App = {
         AM_Instance = instance;
         return AM_Instance.getAssetByState(0);
       }).then((assetsIndexList) => {
-        //console.log("assetsIndexList", assetsIndexList)
+        console.log("assetsIndexList", assetsIndexList)
         //console.log("assetsIndexList", assetsIndexList[0].toNumber())
         let totalAssetItems = assetsIndexList.length;
         let loadCountAsset = 0;
-        //console.log("Length", totalAssetItems)
+        //console.log("Ass----Length", totalAssetItems)
         if (totalAssetItems > 0) {
           console.log("Total Asset", totalAssetItems)
           for (let i = 0; i < totalAssetItems; i++) {
@@ -445,7 +523,7 @@ App = {
                             <td>${date.toLocaleDateString()}</td>
                             <td><a href="https://ropsten.etherscan.io/address/${arr[idx].administrator}" target="_blank">${arr[idx].administrator.slice(0, 7)}...${arr[idx].administrator.slice(-7)}</a></td>
                             <td>
-                            <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id}); return false;"><i
+                            <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id}, '${arr[idx].serialnumber}'); return false;"><i
                             class="fa fa-car" aria-hidden="true"></i> Calibrate</button></center>
                             </td>
                             </tr>`
@@ -503,7 +581,7 @@ App = {
                         <td>${date.toLocaleDateString()}</td>
                         <td>${arr[idx].administrator}</td>
                         <td>
-                        <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id}); return false;"><i
+                        <center><button class="btn btn-primary" onclick="App.LoadAddCalibrationPage(${arr[idx].id},'${arr[idx].serialnumber}'); return false;"><i
                         class="fa fa-car" aria-hidden="true"></i> Calibrate</button></center>
                         </td>
                         </tr>`
@@ -533,7 +611,7 @@ App = {
             }
           }
         } else {
-          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          $('#service-center-asset-body').html(`<div class="alert alert-info" role="alert">
           There are no new asset added recently. Kinly check latter.
         </div>`);
         }
@@ -560,11 +638,12 @@ App = {
                 App.calibrationListArray.push({
                   'calibrationsIndex': calibrationItem[0].toNumber(),
                   'assetIndex': calibrationItem[1].toNumber(),
+                  'serialNumber': calibrationItem[3],
                   'date': calibrationItem[2],
-                  'calibrationType1': calibrationItem[3],
-                  'calibrationType2': calibrationItem[4],
-                  'calibrationType3': calibrationItem[5],
-                  'owner': calibrationItem[6]
+                  'calibrationType1': calibrationItem[4],
+                  'calibrationType2': calibrationItem[5],
+                  'calibrationType3': calibrationItem[6],
+                  'owner': calibrationItem[7]
                 })
 
                 if (countLoadCalibrations + 1 == totalCalibrationsItems) {
@@ -576,6 +655,7 @@ App = {
                     <thead>
                         <tr>
                             <th>Date</th>
+                            <th>Serial Number</th>
                             <th>Calibration Type 1</th>
                             <th>Calibration Type 2</th>
                             <th>Calibration Type 3</th>
@@ -592,6 +672,7 @@ App = {
                         bodyStr += `<tr>
 
                             <td>${date.toLocaleDateString()}</td>
+                            <td>${arr[idx].serialNumber}</td>
                             <td>${arr[idx].calibrationType1}</td>
                             <td>${arr[idx].calibrationType2}</td>
                             <td>${arr[idx].calibrationType3}</td>
@@ -611,6 +692,7 @@ App = {
                         <tfoot>
                             <tr>
                             <th>Date</th>
+                            <th>Serial Number</th>
                             <th>Calibration Type 1</th>
                             <th>Calibration Type 2</th>
                             <th>Calibration Type 3</th>
@@ -628,7 +710,7 @@ App = {
 
           }
         } else {
-          $('#service-center-calibration-body').html(`<div class="alert alert-danger" role="alert">
+          $('#service-center-calibration-body').html(`<div class="alert alert-info" role="alert">
           Your calibration list is empty.
         </div>`);
         }
@@ -652,24 +734,107 @@ App = {
         AM_Instance = instance;
         return AM_Instance.assets(parseInt(assetIndex));
       }).then((receipt) => {
-        //console.log(receipt);
+
         var date = new Date(parseInt(receipt[4]));
         $('#item').html(`${receipt[2]}`)
         $('#serialnumber').html(`${receipt[3]}`)
         $('#dateCommissioned').html(`${date.toLocaleDateString()}`)
         $('#admin').html(`${receipt[5]}`)
+
+        return AM_Instance.getCalibrationsByAssets(parseInt(assetIndex))
+      }).then((calItems) => {
+
+        let totalCalTime = calItems.length;
+        let loadCalItem = 0;
+
+        App.calibrationListArray = new Array();
+
+        for (let i = 0; i < calItems.length; i++) {
+          AM_Instance.calibrations(calItems[i].toNumber())
+            .then((calibrationItem) => {
+
+              App.calibrationListArray.push({
+                'calibrationsIndex': calibrationItem[0].toNumber(),
+                'assetIndex': calibrationItem[1].toNumber(),
+                'serialNumber': calibrationItem[3],
+                'date': calibrationItem[2],
+                'calibrationType1': calibrationItem[4],
+                'calibrationType2': calibrationItem[5],
+                'calibrationType3': calibrationItem[6],
+                'owner': calibrationItem[7]
+              })
+
+              if (loadCalItem + 1 == totalCalTime) {
+                console.log("All Cal Item Loaded.")
+
+                if (App.calibrationListArray.length > 0) {
+
+
+
+                  let bodyStr = `<table id="calibration" class="display"  style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Serial Number</th>
+                                <th>Calibration Type 1</th>
+                                <th>Calibration Type 2</th>
+                                <th>Calibration Type 3</th>
+                                <th>Calibration By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            `
+
+                  for (let each in App.calibrationListArray) {
+                    (function (idx, arr) {
+                      var date = new Date(parseInt(arr[idx].date));
+                      //console.log(arr[idx])
+                      bodyStr += `<tr>
+                            <td>${date.toLocaleDateString()}</td>
+                            <td>${arr[idx].serialNumber}</td>
+                            <td>${arr[idx].calibrationType1}</td>
+                            <td>${arr[idx].calibrationType2}</td>
+                            <td>${arr[idx].calibrationType3}</td>
+                            <td><a href="https://ropsten.etherscan.io/address/${arr[idx].owner}" target="_blank">${arr[idx].owner.slice(0, 7)}...${arr[idx].owner.slice(-7)}</a></td>
+                            </tr>`
+                    })(each, App.calibrationListArray);
+                  }
+
+                  bodyStr += `
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                <th>Date</th>
+                                <th>Serial Number</th>
+                                <th>Calibration Type 1</th>
+                                <th>Calibration Type 2</th>
+                                <th>Calibration Type 3</th>
+                                <th>Calibration By</th>
+                                </tr>
+                            </tfoot>
+                        </table>`
+                  $('#calibratedList').html(bodyStr);
+                  $('#calibration').DataTable();
+
+                }
+
+              } else {
+                loadCalItem++
+              }
+            })
+        }
       }).catch((error) => {
         console.error("--Error--", error)
       })
-
     })
   },
 
-  LoadAddCalibrationPage: function (assetIndex) {
+  LoadAddCalibrationPage: function (assetIndex, serialNumber) {
     //AM_Instance.addCalibration(1, "123456789"/date, "A", "B", "C", { from: service });
     $('#content').empty();
     $('#content').load('add-calibration.html', function () {
       $('#assetIndex').val(`${assetIndex}`);
+      $('#serialNumber').val(`${serialNumber}`);
     })
   },
 
@@ -678,6 +843,7 @@ App = {
 
     const assetIndex = $('#assetIndex').val();
     const date = d.getTime().toString();
+    const serialNumber = $('#serialNumber').val();
     const CalibrationType1 = $('#ct1').val();
     const CalibrationType2 = $('#ct2').val();
     const CalibrationType3 = $('#ct3').val();
@@ -690,12 +856,18 @@ App = {
 
       App.contracts.AssetsManagement.deployed().then(function (instance) {
         AM_Instance = instance;
-        return AM_Instance.addCalibration(parseInt(assetIndex), date, CalibrationType1, CalibrationType2, CalibrationType3, { from: App.account });
+        return AM_Instance.addCalibration(parseInt(assetIndex), date, serialNumber, CalibrationType1, CalibrationType2, CalibrationType3, { from: App.account });
       }).then((receipt) => {
         //console.log(receipt);
         if (receipt.tx) {
           $('#content').show();
           $('#loader').hide();
+
+          App.toast.fire({
+            type: 'success',
+            title: 'Calibration added successfully.'
+          })
+
           App.LoadServiceCenterPage();
         }
       }).catch((error) => {
@@ -706,7 +878,7 @@ App = {
       $('#content').show();
       $('#loader').hide();
       $('#content').empty();
-      $('#content').html(`<div class="alert alert-danger">
+      $('#content').html(`<div class="alert alert-info">
       <strong>Error!</strong> Required field missing. Try again
     </div><br/><button class="btn btn-primary" onclick="App.LoadLandingPage(); return false;">Ok</button>`);
     }
@@ -772,7 +944,7 @@ App = {
                         //console.log("----", date, typeof (arr[idx].date))
                         bodyStr += `<tr>
                             <td><center>`
-                        
+
                         if (arr[idx].calibrated == 1) {
                           bodyStr += `<i class="fa fa-check-circle fa-2x" style="color:green" aria-hidden="true"></i>`
                         } else {
@@ -784,13 +956,13 @@ App = {
                             <td>${date.toLocaleDateString()}</td>
                             <td><a href="https://ropsten.etherscan.io/address/${arr[idx].creator}" target="_blank">${arr[idx].creator.slice(0, 7)}...${arr[idx].creator.slice(-7)}</a></td>
                             <td><center>`
-                        if (arr[idx].calibrated == 1) {
-                          bodyStr += `<button class="btn btn-primary" onclick="App.LoadAssetDetailPageForDriver('LoadDriverPage',${arr[idx].index}); return false;">
+                        //if (arr[idx].calibrated == 1) {
+                        bodyStr += `<button class="btn btn-primary" onclick="App.LoadAssetDetailPageForDriver('LoadDriverPage',${arr[idx].index},'${arr[idx].calibrated}'); return false;">
                                         <i class="fa fa-info-circle" aria-hidden="true"></i> View Asset
                                       </button>`
-                        }else{
-                          bodyStr += `--`;
-                        }
+                        //} else {
+                        //  bodyStr += `--`;
+                        //}
                         bodyStr += `</center></td>
                             </tr>`
                       })(each, App.assetListArray);
@@ -820,7 +992,7 @@ App = {
 
           }
         } else {
-          $('#dealer-body').html(`<div class="alert alert-danger" role="alert">
+          $('#dealer-body').html(`<div class="alert alert-info" role="alert">
           The Asset list is empty.
         </div>`);
         }
@@ -830,17 +1002,18 @@ App = {
     });
   },
 
-  LoadAssetDetailPageForDriver: function (backBtnStr, assetIndex) {
+  LoadAssetDetailPageForDriver: function (backBtnStr, assetIndex, calibrated) {
     $('#content').empty();
     $('#content').load('detail-view.html', function () {
-      $('#backBtnCont').html(`<button class="btn btn-primary" onclick="App.${backBtnStr}(); return false;"><i
+      let btnStr = "";
+      if (calibrated == 1) {
+        btnStr += `<button class="btn btn-primary" onclick="App.UpdateForRecalibration(${assetIndex}); return false;"><i
+      class="fa fa-car" aria-hidden="true"></i> Request For Recalibration</button>`
+      }
+      $('#backBtnCont').html(`${btnStr} <button class="btn btn-primary ml-1" onclick="App.${backBtnStr}(); return false;"><i
       class="fa fa-arrow-left" aria-hidden="true"></i> Back</button>`);
 
-      $('#calDate').html('');
-      $('#ct1').html('')
-      $('#ct2').html('')
-      $('#ct3').html('')
-      $('#owner').html('')
+
 
       App.contracts.AssetsManagement.deployed().then(function (instance) {
         AM_Instance = instance;
@@ -853,37 +1026,121 @@ App = {
         $('#dateCommissioned').html(`${date.toLocaleDateString()}`)
         $('#admin').html(`${receipt[5]}`)
 
-        return AM_Instance.calibrationsIndex();
-      }).then((count) => {
-        //console.log(count.toNumber());
-        let loadCount=0;
-        for(let i=1; i<=count.toNumber(); i++){
-          AM_Instance.calibrations(i)
-          .then((item)=>{
-            //console.log(item)
-            if(item[1].toNumber() === assetIndex){
-              $('#calDate').html(`${item[2]}`);
-              $('#ct1').html(`${item[3]}`);
-              $('#ct2').html(`${item[4]}`);
-              $('#ct3').html(`${item[5]}`);
-              $('#owner').html(`${item[6]}`);
-            }
+        return AM_Instance.getCalibrationsByAssets(parseInt(assetIndex))
+      }).then((calItems) => {
 
-            if(loadCount + 1 == count){
-              console.log("Calibrations Data Loading Over", "Total: ", count)
-            }else{
-              loadCount++
-            }
-          })
-          .catch((error)=>{
-            console.error("--Error--", error)
-          })
+        let totalCalTime = calItems.length;
+        let loadCalItem = 0;
+
+        App.calibrationListArray = new Array();
+
+        for (let i = 0; i < calItems.length; i++) {
+          AM_Instance.calibrations(calItems[i].toNumber())
+            .then((calibrationItem) => {
+
+              App.calibrationListArray.push({
+                'calibrationsIndex': calibrationItem[0].toNumber(),
+                'assetIndex': calibrationItem[1].toNumber(),
+                'serialNumber': calibrationItem[3],
+                'date': calibrationItem[2],
+                'calibrationType1': calibrationItem[4],
+                'calibrationType2': calibrationItem[5],
+                'calibrationType3': calibrationItem[6],
+                'owner': calibrationItem[7]
+              })
+
+              if (loadCalItem + 1 == totalCalTime) {
+                console.log("All Cal Item Loaded.")
+
+                if (App.calibrationListArray.length > 0) {
+
+
+
+                  let bodyStr = `<table id="calibration" class="display"  style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Serial Number</th>
+                                <th>Calibration Type 1</th>
+                                <th>Calibration Type 2</th>
+                                <th>Calibration Type 3</th>
+                                <th>Calibration By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            `
+
+                  for (let each in App.calibrationListArray) {
+                    (function (idx, arr) {
+                      var date = new Date(parseInt(arr[idx].date));
+                      //console.log(arr[idx])
+                      bodyStr += `<tr>
+                            <td>${date.toLocaleDateString()}</td>
+                            <td>${arr[idx].serialNumber}</td>
+                            <td>${arr[idx].calibrationType1}</td>
+                            <td>${arr[idx].calibrationType2}</td>
+                            <td>${arr[idx].calibrationType3}</td>
+                            <td><a href="https://ropsten.etherscan.io/address/${arr[idx].owner}" target="_blank">${arr[idx].owner.slice(0, 7)}...${arr[idx].owner.slice(-7)}</a></td>
+                            </tr>`
+                    })(each, App.calibrationListArray);
+                  }
+
+                  bodyStr += `
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                <th>Date</th>
+                                <th>Serial Number</th>
+                                <th>Calibration Type 1</th>
+                                <th>Calibration Type 2</th>
+                                <th>Calibration Type 3</th>
+                                <th>Calibration By</th>
+                                </tr>
+                            </tfoot>
+                        </table>`
+                  $('#calibratedList').html(bodyStr);
+                  $('#calibration').DataTable();
+
+                }
+
+              } else {
+                loadCalItem++
+              }
+            })
         }
       }).catch((error) => {
         console.error("--Error--", error)
       })
 
     })
+  },
+
+  UpdateForRecalibration: function (assetIndex) {
+    console.log(assetIndex)
+
+    $('#content').hide();
+    $('#loader').show();
+
+    App.contracts.AssetsManagement.deployed().then(function (instance) {
+      AM_Instance = instance;
+      return AM_Instance.updateAssetForCalibration(parseInt(assetIndex), { from: App.account });
+    }).then((receipt) => {
+
+      if (receipt.tx) {
+        $('#content').show();
+        $('#loader').hide();
+        App.LoadDriverPage();
+
+        App.toast.fire({
+          type: 'success',
+          title: 'Recalibration added successfully.'
+        })
+      }
+
+    }).catch((error) => {
+      console.error("--Error--", error)
+    })
+
   },
 
 
