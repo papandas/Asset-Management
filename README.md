@@ -24,13 +24,13 @@ Asset Management on EVM using [Ropsten Testnet](https://ropsten.etherscan.io/)
 2. Click "Connections".
 
 <p align="center">
-  <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0433.png">
+  <img width="180" height="300" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0433.png">
 </p>
 
 3. Add your site name and click connect.
 
 <p align="center">
-  <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0434.png">
+  <img width="180" height="300" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0434.png">
 </p>
 
 ## Know your UI
