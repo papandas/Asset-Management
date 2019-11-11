@@ -16,7 +16,8 @@
             </div>
 
             <h4 class="row justify-content-center align-self-center">Service Center</h4>
-            <center><button class="btn btn-primary" onclick="App.LoadServiceCenterPage(); return false;">Click Here</button></center>
+            <center><button class="btn btn-primary" onclick="App.LoadServiceCenterPage(); return false;">Click
+                    Here</button></center>
 
         </div>
         <div class="col-md-4 col-sm-4">
@@ -36,22 +37,69 @@
                 <div class="row">
                     <div class="col-lg-8 mx-auto">
                         <h2>OVERVIEW</h2>
-                        <p class="lead">This is a blockchain (Ethereum) based Asset Management application. In order demonstrate the concept it’s been packaged as a fictional vehicle log book app. The vehicle being the asset and the log book being the digital record of ownership and maintenance.</p>
+                        <p class="lead">This is a blockchain (Ethereum) based Asset Management application. In order
+                            demonstrate the concept it’s been packaged as a fictional vehicle log book app. The vehicle
+                            being the asset and the log book being the digital record of ownership and maintenance.</p>
                         <h2>INSTRUCTIONS FOR USE</h2>
 
                         <h4>1. Get Metamask</h4>
-                        <p>This demo works with Metamask. You can download the Metamask plugin on https://metamask.io/. It serves as identification and as a wallet.</p>
+                        <p>This demo works with Metamask. You can download the Metamask plugin on https://metamask.io/.
+                            It serves as identification and as a wallet.</p>
                         <p>After downloading and logging in, you need to select the Ropsten Test Network. </p>
-                        <p>Ropsten is a test network. You can get free Ether to use on this network by going to a faucet such as https://faucet.ropsten.be/.</p>
+                        <p>Ropsten is a test network. You can get free Ether to use on this network by going to a faucet
+                            such as https://faucet.ropsten.be/.</p>
 
                         <h4>2. Create Test Accounts</h4>
                         <p>To trial this application, you’ll need to create 3 test accounts on Metamask.</p>
                         <ul>
-                            <li>Test Account 1: The car dealer. This will belong to the dealership that first sells the vehicle to its owner. Once you’ve created this account, refresh the page. A popup will ask you who this account belongs to. Select “Dealer”. You’ll need to fund this account with some ether.</li>
-                            <li>Test Account 2: The car owner (driver). This will belong to the owner who will purchase the car from the dealer. Once you’ve created this account, refresh the page. A popup will ask you who this account belongs to. Select “Dealer”.</li>
-                            <li>Test Account 3: The service center. This is a centre that will service the car. You can create more than one of these to simulate getting your car serviced at more than one dealer. Once you’ve created this account, refresh the page. A popup will ask you who this account belongs to. Select “Dealer”. You’ll need to fund this account with some ether.</li>
+                            <li>Test Account 1: The car dealer. This will belong to the dealership that first sells the
+                                vehicle to its owner. Once you’ve created this account, refresh the page. A popup will
+                                ask you who this account belongs to. Select “Dealer”. You’ll need to fund this account
+                                with some ether.</li>
+                            <li>Test Account 2: The car owner (driver). This will belong to the owner who will purchase
+                                the car from the dealer. Once you’ve created this account, refresh the page. A popup
+                                will ask you who this account belongs to. Select “Dealer”.</li>
+                            <li>Test Account 3: The service center. This is a centre that will service the car. You can
+                                create more than one of these to simulate getting your car serviced at more than one
+                                dealer. Once you’ve created this account, refresh the page. A popup will ask you who
+                                this account belongs to. Select “Dealer”. You’ll need to fund this account with some
+                                ether.</li>
                         </ul>
-                        <p><i>(when processing transactions with Metamast you can set the gas fee to “fast” for quick processing)</i></p>
+                        <p><i>(when processing transactions with Metamast you can set the gas fee to “fast” for quick
+                                processing)</i></p>
+
+                        <h4>3. Sell a Vehicle</h4>
+                        <p>Copy the owner’s address (public key) from Metamask and paste it somewhere for later use
+                        (clipboard is fine).</p>
+                        <p>Select the Dealer account and click on the dealer icon to begin.</p>
+                        <p>Click on “add new asset”. Fill in some random vehicle model. Create a serial number and remember
+                        it. In the Administrator field, enter (or select from dropdown) the Driver’s wallet address
+                        (that you copied earlier).</p>
+                        <p>Click “save” and process the transaction with Metamask when it pops up. Click “back” once the
+                        transaction is processed.</p>
+
+                        <h4>4. View the Vehicle</h4>
+                        <p>Select the Owner account and refresh the page. “Click on “Driver”. You’ll see a list of all your
+                        vehicles.</p>
+                        <p>Find the vehicle you’ve just added and click on “View Asset”. There should be no calibration
+                        detail yet at this point.</p>
+                        <p>Click “back”.</p>
+
+                        <h4>5. Perform a Service</h4>
+                        <p>Select the service center account and refresh the page. Click on “Service Center”.</p>
+                        <p>From the list, select the vehicle you just added. Click “Calibrate”.</p>
+                        <p>Fill in some arbitrary details like “15000km service” or “break pads replaced” and click “save”.
+                        Click “back” when done.</p>
+
+                        <h4>6. View the Vehicle Again</h4>
+                        <p>Perform step 4 again and note the new calibration details have been added. You can repeat this
+                        step as many times as you like.</p>
+
+                        <h4>7. View the Contract on Etherscan</h4>
+                        <p>Click on “Account” in the top right. Below “Contract”, click on “View on Etherscan”.
+                        Here you will see all your recent transactions. You’ll also be able to read the details of the
+                        contract and interact with it directly.</p>
+
                     </div>
                 </div>
             </div>
