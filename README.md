@@ -21,7 +21,7 @@ Asset Management on EVM using [Ropsten Testnet](https://ropsten.etherscan.io/)
 > Manually add a site to allow it access to your accounts, useful for older dapps
 
 1. Open MetaMask and Go to Settings
-2. Click "Connect".
+2. Click "Connections".
 
 <p align="center">
   <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0433.png">
