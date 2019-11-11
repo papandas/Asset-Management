@@ -15,6 +15,20 @@ Asset Management on EVM using [Ropsten Testnet](https://ropsten.etherscan.io/)
   - Can check the list of all assets administrated by driver
   - View a detail list of Assets and Respective Calibration.
 
-  <p align="center">
-  <img width="460" height="300" src="http://www.fillmurray.com/460/300">
+
+## Add Site to MetaMask
+
+> Manually add a site to allow it access to your accounts, useful for older dapps
+
+1. Open MetaMask and Go to Settings
+2. Click "Connect".
+
+<p align="center">
+  <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0433.png">
+</p>
+
+3. Add your site name and click connect.
+
+<p align="center">
+  <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0434.png">
 </p>
