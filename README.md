@@ -32,3 +32,11 @@ Asset Management on EVM using [Ropsten Testnet](https://ropsten.etherscan.io/)
 <p align="center">
   <img width="357" height="600" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0434.png">
 </p>
+
+## Know your UI
+
+> Top right corner of the UI/UX holds the container which has Accounts Detail as well as Smart Contract Details. 
+
+<p align="center">
+  <img width="683" height="333" src="https://papandas.github.io/Asset-Management/instructions/2019-11-12_0445.png">
+</p>
